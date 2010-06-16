@@ -236,8 +236,11 @@ str_vector_t *new_str_vector()
 irg_vector_t *new_irg_vector()
 {
 	irg_vector_t *v = malloc(sizeof(irg_vector));
-	v-> graphs = malloc(sizeof(irg_vector_t));
-	v-
+	v->graphs = malloc(5 * sizeof(ir_graph));
+	v->p = 0;
+	v->size = 5;
+	return v;
+}
 
 void push_back_expr(expr_vector_t *v, expr_t *expr)
 {
@@ -270,6 +273,8 @@ void push_back_str(str_vector_t *v, char *str)
 		v->size *= 2;
 	}
 }
+
+void push_back_irg(irg_vector_t *v, i
 
 // ********************* Parser *************************
 
