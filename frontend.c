@@ -426,6 +426,7 @@ expr_t *parse_primary()
 		return parse_paren_expr();
 	default:
 		error("unknown token when expecting an expression");
+		printf("DEBUG: %s - curtok: %i\n", id_str, cur_token);
 		return NULL;
 	}
 }
@@ -668,6 +669,7 @@ void func_to_firm(function_t *fn)
 
 	add_irp_irg(fun_graph);
 	push_back_irg(flist, fun_graph);
+	dump_ir_block_graph(fun_graph, "");
 }
 
 void top_lvl_to_firm(function_t *fn)

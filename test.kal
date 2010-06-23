@@ -1,0 +1,4 @@
+def plustwo(x)
+	x + 2
+
+plustwo(5)
