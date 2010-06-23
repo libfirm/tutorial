@@ -477,7 +477,7 @@ function_t *parse_definition()
 	return fn;
 }
 
-expr_t *parse_extern()
+prototype_t *parse_extern()
 {
 	next_token();
 	return parse_prototype();
@@ -509,8 +509,10 @@ expr_t *parse_expr()
 typedef struct param_list {
 	int n;
 	char **name;
-	ir_node *proj;
+	ir_node **proj;
 } param_list;
+
+ir_node *handle_expr(expr_t *expr, param_list *plist);
 
 param_list *new_param_list(int n)
 {
@@ -535,34 +537,18 @@ ir_node *get_from_param_list(param_list *plist, char *name)
 	return proj;
 }
 
-ir_node *handle_expr(expr_t *expr, param_list *plist)
-{
-	switch (expr->which) {
-	case EXPR_NUM:
-		return new_Const(new_tarval_from_double(expr->expr->val, d_mode));
-	case EXPR_BIN:
-		return handle_bin_expr((bin_expr_t *) expr->expr, plist);
-		// TODO return proj auf ergebnis ?????
-	case EXPR_VAR:
-		return handle_var_expr((var_expr_t *) expr->expr, plist);	
-	case EXPR_CALL:
-		return handle_call_expr((call_expr_t *) expr->expr, plist);
-		// auch proj
-	default:
-		return NULL;
-	}
-}
-
-ir_node *handle_bin_expr(bin_expr_t *bin_ex, plist)
+ir_node *handle_bin_expr(bin_expr_t *bin_ex, param_list *plist)
 {
 	// lhs and rhs are both expressions
-	ir_node *lhs = handle_exp(bin_ex->lhs, plist);
-	ir_node *rhs = handle_exp(bin_ex->rhs, plist);
+	ir_node *lhs = handle_expr(bin_ex->lhs, plist);
+	ir_node *rhs = handle_expr(bin_ex->rhs, plist);
 
 	switch (bin_ex->op) {
 	case '<':
+	{
 		ir_node *cmp = new_Cmp(lhs, rhs);
 		return new_Proj(cmp, d_mode, pn_Cmp_Lt);
+	}
 	case '+':
 		return new_Add(lhs, rhs, d_mode);
 	case '-':
@@ -575,28 +561,45 @@ ir_node *handle_bin_expr(bin_expr_t *bin_ex, plist)
 	}
 }
 
-ir_node *handle_var_expr(var_expr_t *var, plist)
+ir_node *handle_var_expr(var_expr_t *var, param_list *plist)
 {
 	return get_from_param_list(plist, var->name);
 }
 
-ir_node *handle_call_expr(call_expr_t *call_exp, plist)
+ir_node *handle_call_expr(call_expr_t *call_expr, param_list *plist)
 {
 	ir_node **in = NULL;
-	if (call_exp->argc > 0)
+	if (call_expr->argc > 0)
 		in = malloc(sizeof(ir_node **) * call_expr->argc);
 
-	for (int i = 0; i < call_expr->argc; i++) {
-		ir_node *p = get_from_param_list(plist, call_expr->argv[i]);
-
-		if (p == NULL)
-			p = new_Const(atof(new_tarval_from_double(call->expr->argv[i])));
-	}
+	for (int i = 0; i < call_expr->argc; i++)
+		in[i] = handle_expr(call_expr->argv[i], plist);
 		
-	ir_node *call = new_Call(cur_store, NULL, call_exp->argc, in, ) // !!!!!!!!!!
+	ir_node *call = new_Call(cur_store, NULL, call_expr->argc, in, NULL); // TODO !!!!!!!!!!
 	cur_store = new_Proj(call, get_modeM(), pn_Generic_M);
 
 	return new_Proj(call, d_mode, pn_Generic_X_regular);
+}
+
+ir_node *handle_expr(expr_t *expr, param_list *plist)
+{
+	switch (expr->which) {
+	case EXPR_NUM:
+	{
+		num_expr_t *num = (num_expr_t *) expr->expr;
+		return new_Const(new_tarval_from_double(num->val, d_mode));
+	}
+	case EXPR_BIN:
+		return handle_bin_expr((bin_expr_t *) expr->expr, plist);
+		// TODO return proj auf ergebnis ?????
+	case EXPR_VAR:
+		return handle_var_expr((var_expr_t *) expr->expr, plist);	
+	case EXPR_CALL:
+		return handle_call_expr((call_expr_t *) expr->expr, plist);
+		// auch proj
+	default:
+		return NULL;
+	}
 }
 
 void func_to_firm(function_t *fn)
@@ -628,10 +631,11 @@ void func_to_firm(function_t *fn)
 			plist->proj[i] = new_Proj(args, d_mode, i);
 		}
 
-		set_irg_curent_block(fun_graph, b);
+		set_irg_current_block(fun_graph, b);
 	}
 
-	ir_node **result = &handle_expr(fn->body, plist);
+	ir_node *node = handle_expr(fn->body, plist);
+	ir_node **result = &node; 
 	ir_node *ret = new_Return(cur_store, 1, result);
 	mature_immBlock(get_irg_current_block(fun_graph));
 
@@ -675,7 +679,7 @@ int loop()
 
 int main()
 {
-	ir_init();
+	ir_init(NULL);
 	new_ir_prog("kaleidoscope");
 	d_mode = get_modeD();
 	d_type = new_type_primitive(d_mode);
