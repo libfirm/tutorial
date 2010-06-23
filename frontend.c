@@ -6,12 +6,23 @@
 
 #include <libfirm/firm.h>
 
+typedef struct irg_vector_t {
+	ir_graph **graph;
+	int p;
+	int size;
+} irg_vector_t;
+
+FILE *file;
+
 ir_mode *d_mode;
 ir_type *d_type;
 
 ir_node *cur_store;
 
 ir_graph *top_lvl;
+ir_node *top_store;
+
+irg_vector_t *flist;
 
 char *id_str;
 double num_val;
@@ -44,14 +55,14 @@ int get_token()
 
 	// Skip whitespace
 	while (isspace(ch))
-		ch = getchar();
+		ch = fgetc(file);
 		
 	if (isalpha(ch)) {
 		int i = 0;
 
 		do {
 			buffer[i++] = ch;
-			ch = getchar();
+			ch = fgetc(file);
 		} while (isalnum(ch));
 		buffer[i] = '\0';
 
@@ -70,7 +81,7 @@ int get_token()
 
 		do {
 			buffer[i++] = ch;
-			ch = getchar();
+			ch = fgetc(file);
 		} while (isdigit(ch) || ch == '.');
 		buffer[i] = '\0';
 
@@ -79,7 +90,7 @@ int get_token()
 	}
 	else if (ch == '#') {
 		// skip comments
-		do ch = getchar();
+		do ch = fgetc(file);
 		while (ch != EOF && ch != '\n' && ch != '\r');
 
 		if (ch == EOF)
@@ -91,7 +102,7 @@ int get_token()
 		ret = TOK_EOF;
 	else {
 		ret = ch;
-		ch = getchar();
+		ch = fgetc(file);
 	}
 
 	return ret;
@@ -211,12 +222,6 @@ typedef struct str_vector_t {
 	int size;
 } str_vector_t;
 
-typedef struct irg_vector_t {
-	ir_graph **graphs;
-	int p;
-	int size;
-} irg_vector_t;
-
 expr_vector_t *new_expr_vector()
 {
 	expr_vector_t *v = malloc(sizeof(expr_vector_t));
@@ -240,7 +245,7 @@ irg_vector_t *new_irg_vector()
 	irg_vector_t *v = malloc(sizeof(irg_vector_t));
 	v->p = 0;
 	v->size = 5;
-	v->graphs = malloc(v->size * sizeof(ir_graph *));
+	v->graph = malloc(v->size * sizeof(ir_graph *));
 	return v;
 }
 
@@ -276,19 +281,48 @@ void push_back_str(str_vector_t *v, char *str)
 	}
 }
 
+typedef struct param_list {
+	int n;
+	char **name;
+	ir_node **proj;
+} param_list;
+
+param_list *new_param_list(int n)
+{
+	param_list *plist = malloc(sizeof(param_list *));
+	plist->n = n;
+	plist->name = malloc(sizeof(char **) * n);
+	plist->proj = malloc(sizeof(ir_node *) * n);
+
+	return plist;
+}
+
+ir_node *get_from_param_list(param_list *plist, char *name)
+{
+	ir_node *proj = NULL;
+
+	for (int i = 0; i < plist->n; i++) {
+		if (strcmp(name, plist->name[i]) == 0) {
+			proj = plist->proj[i];
+			break;
+		}
+	}
+	return proj;
+}
+
 void push_back_irg(irg_vector_t *v, ir_graph *g)
 {
-	v->graphs[v->p++] = g;
+	v->graph[v->p++] = g;
 
 	if (v->p == v->size) {
 		v->size *= 2;
 		ir_graph **new = malloc(v->size * sizeof(ir_graph *));
 
 		for (int i = 0; i < v->size; i++)
-			new[i] = v->graphs[i];
+			new[i] = v->graph[i];
 
-		free(v->graphs);
-		v->graphs = new;
+		free(v->graph);
+		v->graph = new;
 	}
 }
 
@@ -506,36 +540,7 @@ expr_t *parse_expr()
 
 // ********************* to firm ***********************
 
-typedef struct param_list {
-	int n;
-	char **name;
-	ir_node **proj;
-} param_list;
-
 ir_node *handle_expr(expr_t *expr, param_list *plist);
-
-param_list *new_param_list(int n)
-{
-	param_list *plist = malloc(sizeof(param_list *));
-	plist->n = n;
-	plist->name = malloc(sizeof(char **) * n);
-	plist->proj = malloc(sizeof(ir_node *) * n);
-
-	return plist;
-}
-
-ir_node *get_from_param_list(param_list *plist, char *name)
-{
-	ir_node *proj = NULL;
-
-	for (int i = 0; i < plist->n; i++) {
-		if (strcmp(name, plist->name[i]) == 0) {
-			proj = plist->proj[i];
-			break;
-		}
-	}
-	return proj;
-}
 
 ir_node *handle_bin_expr(bin_expr_t *bin_ex, param_list *plist)
 {
@@ -568,17 +573,35 @@ ir_node *handle_var_expr(var_expr_t *var, param_list *plist)
 
 ir_node *handle_call_expr(call_expr_t *call_expr, param_list *plist)
 {
+	ir_graph *callee = NULL;
+	ir_entity *ent = NULL;
 	ir_node **in = NULL;
+	ir_node *proj = NULL;
+
 	if (call_expr->argc > 0)
 		in = malloc(sizeof(ir_node **) * call_expr->argc);
 
-	for (int i = 0; i < call_expr->argc; i++)
-		in[i] = handle_expr(call_expr->argv[i], plist);
-		
-	ir_node *call = new_Call(cur_store, NULL, call_expr->argc, in, NULL); // TODO !!!!!!!!!!
-	cur_store = new_Proj(call, get_modeM(), pn_Generic_M);
+	for (int i = 0; i < flist->p; i++) {
+		ent = get_irg_entity(flist->graph[i]);
 
-	return new_Proj(call, d_mode, pn_Generic_X_regular);
+		if (!strcmp(get_entity_name(ent), call_expr->callee)) {
+			callee = flist->graph[i];
+			break;
+		}
+	}
+
+	if (callee != NULL) {
+		for (int i = 0; i < call_expr->argc; i++)
+			in[i] = handle_expr(call_expr->argv[i], plist);
+
+		ir_node *call = new_Call(cur_store, NULL, call_expr->argc, in, NULL); // TODO !!!!!!!!!!
+		cur_store = new_Proj(call, get_modeM(), pn_Generic_M);
+		proj = new_Proj(call, d_mode, pn_Generic_X_regular);
+	} else {
+		error("Cannot call unknown function.");
+	}
+
+	return proj;
 }
 
 ir_node *handle_expr(expr_t *expr, param_list *plist)
@@ -591,12 +614,12 @@ ir_node *handle_expr(expr_t *expr, param_list *plist)
 	}
 	case EXPR_BIN:
 		return handle_bin_expr((bin_expr_t *) expr->expr, plist);
-		// TODO return proj auf ergebnis ?????
+		// TODO? return proj auf ergebnis ?????
 	case EXPR_VAR:
 		return handle_var_expr((var_expr_t *) expr->expr, plist);	
 	case EXPR_CALL:
 		return handle_call_expr((call_expr_t *) expr->expr, plist);
-		// auch proj
+		// auch proj ?
 	default:
 		return NULL;
 	}
@@ -642,12 +665,17 @@ void func_to_firm(function_t *fn)
 	ir_node *end = get_irg_end_block(fun_graph);
 	add_immBlock_pred(end, ret);
 	mature_immBlock(end);
+
+	add_irp_irg(fun_graph);
+	push_back_irg(flist, fun_graph);
 }
 
 void top_lvl_to_firm(function_t *fn)
 {
+	cur_store = top_store;
 	set_current_ir_graph(top_lvl);
 	handle_expr(fn->body, NULL);
+	top_store = cur_store;
 }
 
 // ******************* Main *************************
@@ -657,6 +685,7 @@ int loop()
 	bool err = false;
 	while (!err) {
 		function_t *fn = NULL;
+		next_token();
 		switch (cur_token) {
 		case TOK_EOF:
 			return 0;
@@ -677,7 +706,7 @@ int loop()
 	return -1;
 }
 
-int main()
+int main(int argc, char **argv)
 {
 	ir_init(NULL);
 	new_ir_prog("kaleidoscope");
@@ -687,9 +716,18 @@ int main()
 	ir_type *top_type = new_type_method(0, 0);
 	ir_entity *top_entity = new_entity(get_glob_type(), new_id_from_str("top_lvl"), top_type);
 	top_lvl = new_ir_graph(top_entity, 0);
+	top_store = get_irg_initial_mem(top_lvl);
 
+	flist = new_irg_vector();
+
+	file = fopen(argv[1], "r");
 	loop();
-	// TODO take care of the end_block of top_lvl
+
+	set_current_ir_graph(top_lvl);
+	ir_node *ret = new_Return(top_store, 0, NULL);
+	add_immBlock_pred(get_irg_end_block(top_lvl), ret);
+	mature_immBlock(get_irg_end_block(top_lvl));
+	set_irp_main_irg(top_lvl);
 
 	ir_finish();
 	return 0;
