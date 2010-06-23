@@ -11,6 +11,8 @@ ir_type *d_type;
 
 ir_node *cur_store;
 
+ir_graph *top_lvl;
+
 char *id_str;
 double num_val;
 int cur_token;
@@ -235,10 +237,10 @@ str_vector_t *new_str_vector()
 
 irg_vector_t *new_irg_vector()
 {
-	irg_vector_t *v = malloc(sizeof(irg_vector));
-	v->graphs = malloc(5 * sizeof(ir_graph));
+	irg_vector_t *v = malloc(sizeof(irg_vector_t));
 	v->p = 0;
 	v->size = 5;
+	v->graphs = malloc(v->size * sizeof(ir_graph *));
 	return v;
 }
 
@@ -274,7 +276,21 @@ void push_back_str(str_vector_t *v, char *str)
 	}
 }
 
-void push_back_irg(irg_vector_t *v, i
+void push_back_irg(irg_vector_t *v, ir_graph *g)
+{
+	v->graphs[v->p++] = g;
+
+	if (v->p == v->size) {
+		v->size *= 2;
+		ir_graph **new = malloc(v->size * sizeof(ir_graph *));
+
+		for (int i = 0; i < v->size; i++)
+			new[i] = v->graphs[i];
+
+		free(v->graphs);
+		v->graphs = new;
+	}
+}
 
 // ********************* Parser *************************
 
@@ -519,48 +535,6 @@ ir_node *get_from_param_list(param_list *plist, char *name)
 	return proj;
 }
 
-
-void func_to_firm(function_t *fn)
-{
-	param_list *plist = NULL;
-	int n_param = fn->proto->argc;
-	// set up the type for the function
-	ir_type *fun_type = new_type_method(n_param, 1);
-	for (int i = 0; i < n_param; i++)
-		set_method_param_type(fun_type, i, d_type);
-	set_method_res_type(fun_type, 0, d_type);
-
-	ir_entity *fun_entity = new_entity(get_glob_type(), new_id_from_str(fn->proto->name), fun_type);
-	// now we can create the graph
-	ir_graph *fun_graph = new_ir_graph(fun_entity, n_param);
-
-	// set cur_store
-	cur_store = get_irg_initial_mem(fung_graph);
-	// create the projs for the parameters
-	if (n_param < 0) {
-		ir_node *b = get_irg_current_block(fun_graph);
-		set_irg_current_block(fun_graph, get_irg_start_block(fun_graph));
-
-		ir_node *args = get_irg_args(fun_graph);
-		plist = new_param_list(n_param);
-
-		for (int i = 0; i < n_param; i++) {
-			plist->name[i] = fn->proto->argv[i];
-			plist->proj[i] = new_Proj(args, d_mode, i);
-		}
-
-		set_irg_curent_block(fun_graph, b);
-	}
-
-	ir_node **result = &handle_expr(fn->body, plist);
-	ir_node *ret = new_Return(cur_store, 1, result);
-	mature_immBlock(get_irg_current_block(fun_graph));
-
-	ir_node *end = get_irg_end_block(fun_graph);
-	add_immBlock_pred(end, ret);
-	mature_immBlock(end);
-}
-
 ir_node *handle_expr(expr_t *expr, param_list *plist)
 {
 	switch (expr->which) {
@@ -568,10 +542,12 @@ ir_node *handle_expr(expr_t *expr, param_list *plist)
 		return new_Const(new_tarval_from_double(expr->expr->val, d_mode));
 	case EXPR_BIN:
 		return handle_bin_expr((bin_expr_t *) expr->expr, plist);
+		// TODO return proj auf ergebnis ?????
 	case EXPR_VAR:
 		return handle_var_expr((var_expr_t *) expr->expr, plist);	
 	case EXPR_CALL:
 		return handle_call_expr((call_expr_t *) expr->expr, plist);
+		// auch proj
 	default:
 		return NULL;
 	}
@@ -623,6 +599,53 @@ ir_node *handle_call_expr(call_expr_t *call_exp, plist)
 	return new_Proj(call, d_mode, pn_Generic_X_regular);
 }
 
+void func_to_firm(function_t *fn)
+{
+	param_list *plist = NULL;
+	int n_param = fn->proto->argc;
+	// set up the type for the function
+	ir_type *fun_type = new_type_method(n_param, 1);
+	for (int i = 0; i < n_param; i++)
+		set_method_param_type(fun_type, i, d_type);
+	set_method_res_type(fun_type, 0, d_type);
+
+	ir_entity *fun_entity = new_entity(get_glob_type(), new_id_from_str(fn->proto->name), fun_type);
+	// now we can create the graph
+	ir_graph *fun_graph = new_ir_graph(fun_entity, n_param);
+
+	// set cur_store
+	cur_store = get_irg_initial_mem(fun_graph);
+	// create the projs for the parameters
+	if (n_param > 0) {
+		ir_node *b = get_irg_current_block(fun_graph);
+		set_irg_current_block(fun_graph, get_irg_start_block(fun_graph));
+
+		ir_node *args = get_irg_args(fun_graph);
+		plist = new_param_list(n_param);
+
+		for (int i = 0; i < n_param; i++) {
+			plist->name[i] = fn->proto->argv[i];
+			plist->proj[i] = new_Proj(args, d_mode, i);
+		}
+
+		set_irg_curent_block(fun_graph, b);
+	}
+
+	ir_node **result = &handle_expr(fn->body, plist);
+	ir_node *ret = new_Return(cur_store, 1, result);
+	mature_immBlock(get_irg_current_block(fun_graph));
+
+	ir_node *end = get_irg_end_block(fun_graph);
+	add_immBlock_pred(end, ret);
+	mature_immBlock(end);
+}
+
+void top_lvl_to_firm(function_t *fn)
+{
+	set_current_ir_graph(top_lvl);
+	handle_expr(fn->body, NULL);
+}
+
 // ******************* Main *************************
 
 int loop()
@@ -642,7 +665,7 @@ int loop()
 			break;
 		default:
 			fn = parse_top_lvl();
-			func_to_firm(fn);
+			top_lvl_to_firm(fn);
 			break;
 		}
 	}
@@ -656,7 +679,13 @@ int main()
 	new_ir_prog("kaleidoscope");
 	d_mode = get_modeD();
 	d_type = new_type_primitive(d_mode);
+	
+	ir_type *top_type = new_type_method(0, 0);
+	ir_entity *top_entity = new_entity(get_glob_type(), new_id_from_str("top_lvl"), top_type);
+	top_lvl = new_ir_graph(top_entity, 0);
+
 	loop();
+	// TODO take care of the end_block of top_lvl
 
 	ir_finish();
 	return 0;
