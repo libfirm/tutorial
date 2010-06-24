@@ -30,9 +30,9 @@ int cur_token;
 
 // ************************** Error *****************************
 
-void error(char *msg)
+void error(char *msg, char *info)
 {
-	fprintf(stderr, "Error: %s.\n", msg);
+	fprintf(stderr, "Error: %s%s.\n", msg, info);
 }
 
 // ************ Lexer ************************************
@@ -370,7 +370,7 @@ expr_t *parse_id_expr()
 					break;
 
 				if (cur_token != ',') {
-					error("Expected ')' or ',' in argument list");
+					error("Expected ')' or ',' in argument list", NULL);
 					arg_error = true;
 					break;
 				}
@@ -408,7 +408,7 @@ expr_t *parse_paren_expr()
 	expr_t *result = parse_expr();
 
 	if (cur_token != ')') {
-		error("')' expected");
+		error("')' expected", NULL);
 		result = NULL;
 	}
 
@@ -425,8 +425,8 @@ expr_t *parse_primary()
 	case '(':
 		return parse_paren_expr();
 	default:
-		error("unknown token when expecting an expression");
-		printf("DEBUG: %s - curtok: %i\n", id_str, cur_token);
+		error("unknown token when expecting an expression", NULL);
+		printf("DEBUG: %s - curtok: %i = %c\n", id_str, cur_token, cur_token);
 		return NULL;
 	}
 }
@@ -464,13 +464,13 @@ prototype_t *parse_prototype()
 	char *fn_name = NULL;
 
 	if (cur_token != TOK_ID) {
-		error("Expected function name in prototype");
+		error("Expected function name in prototype", NULL);
 	} else {
 		fn_name = id_str;
 		next_token();
 
 		if (cur_token != '(') {
-			error("Expected '(' in prototype");
+			error("Expected '(' in prototype", NULL);
 		} else {
 			arg_names = new_str_vector();
 	
@@ -478,7 +478,7 @@ prototype_t *parse_prototype()
 				push_back_str(arg_names, id_str);
 
 			if (cur_token != ')') {
-				error("Expected ')' in prototype");
+				error("Expected ')' in prototype", NULL);
 				free(arg_names);
 				arg_names = NULL;
 			}
@@ -562,7 +562,7 @@ ir_node *handle_bin_expr(bin_expr_t *bin_ex, param_list *plist)
 	case '*':
 		return new_Mul(lhs, rhs, d_mode);
 	default:
-		error("Invalid binary expression.\n");
+		error("Invalid binary expression.\n", NULL);
 		return NULL;
 	}
 }
@@ -574,10 +574,12 @@ ir_node *handle_var_expr(var_expr_t *var, param_list *plist)
 
 ir_node *handle_call_expr(call_expr_t *call_expr, param_list *plist)
 {
-	ir_graph *callee = NULL;
+	printf("DEBUG: call to %s\n", call_expr->callee);
+
+	ir_node *callee = NULL;
 	ir_entity *ent = NULL;
 	ir_node **in = NULL;
-	ir_node *proj = NULL;
+	ir_node *result = NULL;
 
 	if (call_expr->argc > 0)
 		in = malloc(sizeof(ir_node **) * call_expr->argc);
@@ -586,7 +588,7 @@ ir_node *handle_call_expr(call_expr_t *call_expr, param_list *plist)
 		ent = get_irg_entity(flist->graph[i]);
 
 		if (!strcmp(get_entity_name(ent), call_expr->callee)) {
-			callee = flist->graph[i];
+			callee = new_SymConst(get_modeP(), (symconst_symbol) ent, symconst_addr_ent);
 			break;
 		}
 	}
@@ -595,14 +597,15 @@ ir_node *handle_call_expr(call_expr_t *call_expr, param_list *plist)
 		for (int i = 0; i < call_expr->argc; i++)
 			in[i] = handle_expr(call_expr->argv[i], plist);
 
-		ir_node *call = new_Call(cur_store, NULL, call_expr->argc, in, NULL); // TODO !!!!!!!!!!
+		ir_node *call = new_Call(cur_store, callee, call_expr->argc, in, get_entity_type(ent));
 		cur_store = new_Proj(call, get_modeM(), pn_Generic_M);
-		proj = new_Proj(call, d_mode, pn_Generic_X_regular);
+		ir_node *tup = new_Proj(call, get_modeT(), pn_Call_T_result);
+		result = new_Proj(tup, d_mode, 0);
 	} else {
-		error("Cannot call unknown function.");
+		error("Cannot call unknown function ", call_expr->callee);
 	}
 
-	return proj;
+	return result;
 }
 
 ir_node *handle_expr(expr_t *expr, param_list *plist)
@@ -628,6 +631,8 @@ ir_node *handle_expr(expr_t *expr, param_list *plist)
 
 void func_to_firm(function_t *fn)
 {
+	printf("DEBUG: in function %s\n", fn->proto->name);
+	
 	param_list *plist = NULL;
 	int n_param = fn->proto->argc;
 	// set up the type for the function
@@ -667,7 +672,7 @@ void func_to_firm(function_t *fn)
 	add_immBlock_pred(end, ret);
 	mature_immBlock(end);
 
-	add_irp_irg(fun_graph);
+	// add_irp_irg(fun_graph); <-- seems to be wrong
 	push_back_irg(flist, fun_graph);
 	dump_ir_block_graph(fun_graph, "");
 }
@@ -716,7 +721,7 @@ int main(int argc, char **argv)
 	d_type = new_type_primitive(d_mode);
 	
 	ir_type *top_type = new_type_method(0, 0);
-	ir_entity *top_entity = new_entity(get_glob_type(), new_id_from_str("top_lvl"), top_type);
+	ir_entity *top_entity = new_entity(get_glob_type(), new_id_from_str("main"), top_type);
 	top_lvl = new_ir_graph(top_entity, 0);
 	top_store = get_irg_initial_mem(top_lvl);
 
@@ -730,6 +735,7 @@ int main(int argc, char **argv)
 	add_immBlock_pred(get_irg_end_block(top_lvl), ret);
 	mature_immBlock(get_irg_end_block(top_lvl));
 	set_irp_main_irg(top_lvl);
+	dump_ir_block_graph(top_lvl, "");
 
 	ir_finish();
 	return 0;

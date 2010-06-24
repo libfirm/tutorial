@@ -1,4 +1,7 @@
 def plustwo(x)
 	x + 2
-
-plustwo(5)
+b 
+def times(x y)
+	x * y
+b
+plustwo(5) - times(3, 4.5)
