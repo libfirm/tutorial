@@ -20,6 +20,7 @@
 #define get_strings(v)	\
 	(char **) v->content
 
+// an unbounded array
 typedef struct vector_t {
 	int p;
 	int size;
@@ -55,6 +56,7 @@ int cur_token;
 
 // ************************** Error *****************************
 
+// obvious ;D
 void error(char *msg, char *info)
 {
 	fprintf(stderr, "Error: %s%s.\n", msg, info);
@@ -153,6 +155,7 @@ typedef struct expr_t {
 	expr_kind which;
 } expr_t;
 
+// structs representing the different kinds of expressions
 typedef struct num_expr_t {
 	double val;
 } num_expr_t;
@@ -637,8 +640,8 @@ void func_to_firm(function_t *fn)
 		set_irg_current_block(fun_graph, get_irg_start_block(fun_graph));
 
 		ir_node *args = get_irg_args(fun_graph);
+		// initialize the parameter list
 		plist = new_param_list(n_param);
-
 		for (int i = 0; i < n_param; i++) {
 			plist->name[i] = fn->head->argv[i];
 			plist->proj[i] = new_Proj(args, d_mode, i);
@@ -647,6 +650,7 @@ void func_to_firm(function_t *fn)
 		set_irg_current_block(fun_graph, b);
 	}
 
+	// handle the function body
 	ir_node *node = handle_expr(fn->body, plist);
 	ir_node **result = &node; 
 	ir_node *ret = new_Return(cur_store, 1, result);
@@ -656,7 +660,7 @@ void func_to_firm(function_t *fn)
 	add_immBlock_pred(end, ret);
 	mature_immBlock(end);
 
-	// add_irp_irg(fun_graph); <-- seems to be wrong
+	// push the function on the function list and dump it
 	push_back(flist, fun_graph);
 	dump_ir_block_graph(fun_graph, "");
 }
@@ -706,21 +710,25 @@ int main(int argc, char **argv)
 	d_mode = get_modeD();
 	d_type = new_type_primitive(d_mode);
 	
+	// prepare the top level ir_graph
 	ir_type *top_type = new_type_method(0, 0);
 	ir_entity *top_entity = new_entity(get_glob_type(), new_id_from_str("main"), top_type);
 	top_lvl = new_ir_graph(top_entity, 0);
 	top_store = get_irg_initial_mem(top_lvl);
 
+	// initialize the file list, open the source file and run the main loop
 	flist = new_vector();
-
 	file = fopen(argv[1], "r");
 	loop();
 
+	// finish the top level ir_graph
 	set_current_ir_graph(top_lvl);
 	ir_node *ret = new_Return(top_store, 0, NULL);
 	add_immBlock_pred(get_irg_end_block(top_lvl), ret);
 	mature_immBlock(get_irg_end_block(top_lvl));
+	// set it as the main function
 	set_irp_main_irg(top_lvl);
+	// and dump it
 	dump_ir_block_graph(top_lvl, "");
 
 	ir_finish();
