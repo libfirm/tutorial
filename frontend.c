@@ -6,6 +6,15 @@
 
 #include <libfirm/firm.h>
 
+// ****************************** Util **********************************
+
+// an unbounded array
+typedef struct vector_t {
+	int p;
+	int size;
+	void **content;
+} vector_t;
+
 // some macros for type safe vectors
 #define irg_vector_t	vector_t
 #define expr_vector_t	vector_t
@@ -20,12 +29,63 @@
 #define get_strings(v)	\
 	(char **) v->content
 
-// an unbounded array
-typedef struct vector_t {
-	int p;
-	int size;
-	void **content;
-} vector_t;
+// constructor for vectors
+vector_t *new_vector()
+{
+	vector_t *v = malloc(sizeof(vector_t));
+	v->p = 0;
+	v->size = 5;
+	v->content = malloc(v->size * sizeof(vector_t));
+	return v;
+}
+
+// used to push things at the end of the vector
+void push_back(vector_t *v, void *element)
+{
+	v->content[v->p++] = element;
+
+	if (v->p == v->size) {
+		v->size *= 2;
+		void **new = malloc(v->size * sizeof(void *));
+
+		for (int i = 0; i < v->size; i++)
+			new[i] = v->content[i];
+
+		free(v->content);
+		v->content = new;
+	}
+}
+
+// maps the parameter names to the corresponding projs
+typedef struct param_list {
+	int n;
+	char **name;
+	ir_node **proj;
+} param_list;
+
+param_list *new_param_list(int n)
+{
+	param_list *plist = malloc(sizeof(param_list *));
+	plist->n = n;
+	plist->name = malloc(sizeof(char **) * n);
+	plist->proj = malloc(sizeof(ir_node *) * n);
+
+	return plist;
+}
+
+// returns the corresponding proj for a name, NULL if name is not found
+ir_node *get_from_param_list(param_list *plist, char *name)
+{
+	ir_node *proj = NULL;
+
+	for (int i = 0; i < plist->n; i++) {
+		if (strcmp(name, plist->name[i]) == 0) {
+			proj = plist->proj[i];
+			break;
+		}
+	}
+	return proj;
+}
 
 // ******************* Global *******************************
 
@@ -86,7 +146,6 @@ int get_token()
 		
 	if (isalpha(ch)) {
 		int i = 0;
-
 		do {
 			buffer[i++] = ch;
 			ch = fgetc(file);
@@ -237,66 +296,6 @@ function_t *new_function(prototype_t *head, expr_t *body)
 	return fn;
 }
 
-// ****************************** Util **********************************
-
-// maps the parameter names to the corresponding projs
-typedef struct param_list {
-	int n;
-	char **name;
-	ir_node **proj;
-} param_list;
-
-param_list *new_param_list(int n)
-{
-	param_list *plist = malloc(sizeof(param_list *));
-	plist->n = n;
-	plist->name = malloc(sizeof(char **) * n);
-	plist->proj = malloc(sizeof(ir_node *) * n);
-
-	return plist;
-}
-
-// returns the corresponding proj for a name, NULL if name is not found
-ir_node *get_from_param_list(param_list *plist, char *name)
-{
-	ir_node *proj = NULL;
-
-	for (int i = 0; i < plist->n; i++) {
-		if (strcmp(name, plist->name[i]) == 0) {
-			proj = plist->proj[i];
-			break;
-		}
-	}
-	return proj;
-}
-
-// constructor for vectors
-vector_t *new_vector()
-{
-	vector_t *v = malloc(sizeof(vector_t));
-	v->p = 0;
-	v->size = 5;
-	v->content = malloc(v->size * sizeof(vector_t));
-	return v;
-}
-
-// used to push things at the end of the vector
-void push_back(vector_t *v, void *element)
-{
-	v->content[v->p++] = element;
-
-	if (v->p == v->size) {
-		v->size *= 2;
-		void **new = malloc(v->size * sizeof(void *));
-
-		for (int i = 0; i < v->size; i++)
-			new[i] = v->content[i];
-
-		free(v->content);
-		v->content = new;
-	}
-}
-
 // ********************* Parser *************************
 
 expr_t *parse_expr();
@@ -323,9 +322,9 @@ expr_t *parse_id_expr()
 
 	next_token();
 
-	if (cur_token != '(')
+	if (cur_token != '(') {
 		id_expr = new_expr(new_var_expr(identifier), EXPR_VAR);
-	else {
+	} else {
 		next_token();
 		if (cur_token != ')') {
 			args = new_vector();
@@ -371,7 +370,7 @@ expr_t *parse_num_expr()
 {
 	num_expr_t *expr = malloc(sizeof(num_expr_t));
 	expr->val = num_val;
-	next_token();
+	//next_token();
 
 	return new_expr(expr, EXPR_NUM);
 }
@@ -401,9 +400,11 @@ expr_t *parse_primary()
 	case '(':
 		return parse_paren_expr();
 	default:
-		error("unknown token when expecting an expression", "");
-		printf("DEBUG: %s - curtok: %i = %c\n", id_str, cur_token, cur_token);
+	{
+		char info[2] = { cur_token, '\0' };
+		error("Unknown token when expecting an expression: ", info);
 		return NULL;
+	}
 	}
 }
 
@@ -545,7 +546,7 @@ ir_node *handle_bin_expr(bin_expr_t *bin_ex, param_list *plist)
 	case '*':
 		return new_Mul(lhs, rhs, d_mode);
 	default:
-		error("Invalid binary expression.\n", "");
+		error("Invalid binary expression", "");
 		return NULL;
 	}
 }
@@ -587,7 +588,7 @@ ir_node *handle_call_expr(call_expr_t *call_expr, param_list *plist)
 		ir_node *tup = new_Proj(call, get_modeT(), pn_Call_T_result);
 		result = new_Proj(tup, d_mode, 0);
 	} else {
-		error("Cannot call unknown function ", call_expr->callee);
+		error("Cannot call unknown function: ", call_expr->callee);
 	}
 
 	return result;
