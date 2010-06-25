@@ -6,11 +6,26 @@
 
 #include <libfirm/firm.h>
 
-typedef struct irg_vector_t {
-	ir_graph **graph;
+#define irg_vector_t	vector_t
+#define expr_vector_t	vector_t
+#define str_vector_t	vector_t
+
+#define get_irg(v, i)	\
+	(ir_graph *) v->content[i]
+
+#define get_expressions(v)	\
+	(expr_t **) v->content
+
+#define get_strings(v)	\
+	(char **) v->content
+
+typedef struct vector_t {
 	int p;
 	int size;
-} irg_vector_t;
+	void **content;
+} vector_t;
+
+// ******************* Global *******************************
 
 FILE *file;
 
@@ -75,8 +90,7 @@ int get_token()
 			strcpy(id_str, buffer);
 			ret = TOK_ID;
 		}
-	}
-	else if (isdigit(ch)) {
+	} else if (isdigit(ch)) {
 		int i = 0;
 
 		do {
@@ -87,8 +101,7 @@ int get_token()
 
 		num_val = atof(buffer);
 		ret = TOK_NUM;
-	}
-	else if (ch == '#') {
+	} else if (ch == '#') {
 		// skip comments
 		do ch = fgetc(file);
 		while (ch != EOF && ch != '\n' && ch != '\r');
@@ -97,8 +110,7 @@ int get_token()
 			ret = TOK_EOF;
 		else
 			ret = get_token();
-	}
-	else if (ch == EOF)
+	} else if (ch == EOF)
 		ret = TOK_EOF;
 	else {
 		ret = ch;
@@ -108,6 +120,7 @@ int get_token()
 	return ret;
 }
 
+// wrapper around get_token()
 int next_token()
 {
 	cur_token = get_token();
@@ -210,77 +223,6 @@ function_t *new_function(prototype_t *proto, expr_t *body)
 
 // ****************************** Util **********************************
 
-typedef struct expr_vector_t {
-	expr_t **exprs;
-	int p;
-	int size;
-} expr_vector_t;
-
-typedef struct str_vector_t {
-	char **strs;
-	int p;
-	int size;
-} str_vector_t;
-
-expr_vector_t *new_expr_vector()
-{
-	expr_vector_t *v = malloc(sizeof(expr_vector_t));
-	v->exprs = malloc(5 * sizeof(expr_t *));
-	v->p = 0;
-	v->size = 5;
-	return v;
-}
-
-str_vector_t *new_str_vector()
-{
-	str_vector_t *v = malloc(sizeof(str_vector_t));
-	v->strs = malloc(5 * sizeof(char *));
-	v->p = 0;
-	v->size = 5;
-	return v;
-}
-
-irg_vector_t *new_irg_vector()
-{
-	irg_vector_t *v = malloc(sizeof(irg_vector_t));
-	v->p = 0;
-	v->size = 5;
-	v->graph = malloc(v->size * sizeof(ir_graph *));
-	return v;
-}
-
-void push_back_expr(expr_vector_t *v, expr_t *expr)
-{
-	v->exprs[v->p++] = expr;
-
-	if (v->p == v->size) {
-		expr_t **new = malloc(2 * v->size * sizeof(expr_t *));
-
-		for (int i = 0; i < v->size; i++)
-			new[i] = v->exprs[i];
-
-		free(v->exprs);
-		v->exprs = new;
-		v->size *= 2;
-	}
-}
-
-void push_back_str(str_vector_t *v, char *str)
-{
-	v->strs[v->p++] = str;
-
-	if (v->p == v->size) {
-		char **new = malloc(2 * v->size * sizeof(char *));
-
-		for (int i = 0; i < v->size; i++)
-			new[i] = v->strs[i];
-
-		free(v->strs);
-		v->strs = new;
-		v->size *= 2;
-	}
-}
-
 typedef struct param_list {
 	int n;
 	char **name;
@@ -310,19 +252,28 @@ ir_node *get_from_param_list(param_list *plist, char *name)
 	return proj;
 }
 
-void push_back_irg(irg_vector_t *v, ir_graph *g)
+vector_t *new_vector()
 {
-	v->graph[v->p++] = g;
+	vector_t *v = malloc(sizeof(vector_t));
+	v->p = 0;
+	v->size = 5;
+	v->content = malloc(v->size * sizeof(vector_t));
+	return v;
+}
+
+void push_back(vector_t *v, void *element)
+{
+	v->content[v->p++] = element;
 
 	if (v->p == v->size) {
 		v->size *= 2;
-		ir_graph **new = malloc(v->size * sizeof(ir_graph *));
+		void **new = malloc(v->size * sizeof(void *));
 
 		for (int i = 0; i < v->size; i++)
-			new[i] = v->graph[i];
+			new[i] = v->content[i];
 
-		free(v->graph);
-		v->graph = new;
+		free(v->content);
+		v->content = new;
 	}
 }
 
@@ -355,7 +306,7 @@ expr_t *parse_id_expr()
 	else {
 		next_token();
 		if (cur_token != ')') {
-			args = new_expr_vector();
+			args = new_vector();
 			while (1) {
 				expr_t *e = parse_expr();
 
@@ -364,13 +315,13 @@ expr_t *parse_id_expr()
 					break;
 				}
 
-				push_back_expr(args, e);
+				push_back(args, e);
 
 				if (cur_token == ')')
 					break;
 
 				if (cur_token != ',') {
-					error("Expected ')' or ',' in argument list", NULL);
+					error("Expected ')' or ',' in argument list", "");
 					arg_error = true;
 					break;
 				}
@@ -383,7 +334,7 @@ expr_t *parse_id_expr()
 
 		if (args != NULL) {
 			if (!arg_error)
-				id_expr = new_expr(new_call_expr(identifier, args->exprs, args->p), EXPR_CALL);
+				id_expr = new_expr(new_call_expr(identifier, get_expressions(args), args->p), EXPR_CALL);
 			free(args);
 		} else {
 			id_expr = new_expr(new_call_expr(identifier, NULL, 0), EXPR_CALL);
@@ -408,7 +359,7 @@ expr_t *parse_paren_expr()
 	expr_t *result = parse_expr();
 
 	if (cur_token != ')') {
-		error("')' expected", NULL);
+		error("')' expected", "");
 		result = NULL;
 	}
 
@@ -425,7 +376,7 @@ expr_t *parse_primary()
 	case '(':
 		return parse_paren_expr();
 	default:
-		error("unknown token when expecting an expression", NULL);
+		error("unknown token when expecting an expression", "");
 		printf("DEBUG: %s - curtok: %i = %c\n", id_str, cur_token, cur_token);
 		return NULL;
 	}
@@ -464,21 +415,21 @@ prototype_t *parse_prototype()
 	char *fn_name = NULL;
 
 	if (cur_token != TOK_ID) {
-		error("Expected function name in prototype", NULL);
+		error("Expected function name in prototype", "");
 	} else {
 		fn_name = id_str;
 		next_token();
 
 		if (cur_token != '(') {
-			error("Expected '(' in prototype", NULL);
+			error("Expected '(' in prototype", "");
 		} else {
-			arg_names = new_str_vector();
+			arg_names = new_vector();
 	
 			while (next_token() == TOK_ID)
-				push_back_str(arg_names, id_str);
+				push_back(arg_names, id_str);
 
 			if (cur_token != ')') {
-				error("Expected ')' in prototype", NULL);
+				error("Expected ')' in prototype", "");
 				free(arg_names);
 				arg_names = NULL;
 			}
@@ -488,7 +439,7 @@ prototype_t *parse_prototype()
 	next_token();
 
 	if (arg_names != NULL) {
-		prototype = new_prototype(fn_name, arg_names->strs, arg_names->p);
+		prototype = new_prototype(fn_name, get_strings(arg_names), arg_names->p);
 		free(arg_names);
 	}
 
@@ -562,7 +513,7 @@ ir_node *handle_bin_expr(bin_expr_t *bin_ex, param_list *plist)
 	case '*':
 		return new_Mul(lhs, rhs, d_mode);
 	default:
-		error("Invalid binary expression.\n", NULL);
+		error("Invalid binary expression.\n", "");
 		return NULL;
 	}
 }
@@ -585,7 +536,7 @@ ir_node *handle_call_expr(call_expr_t *call_expr, param_list *plist)
 		in = malloc(sizeof(ir_node **) * call_expr->argc);
 
 	for (int i = 0; i < flist->p; i++) {
-		ent = get_irg_entity(flist->graph[i]);
+		ent = get_irg_entity(get_irg(flist, i));
 
 		if (!strcmp(get_entity_name(ent), call_expr->callee)) {
 			callee = new_SymConst(get_modeP(), (symconst_symbol) ent, symconst_addr_ent);
@@ -673,7 +624,7 @@ void func_to_firm(function_t *fn)
 	mature_immBlock(end);
 
 	// add_irp_irg(fun_graph); <-- seems to be wrong
-	push_back_irg(flist, fun_graph);
+	push_back(flist, fun_graph);
 	dump_ir_block_graph(fun_graph, "");
 }
 
@@ -725,7 +676,7 @@ int main(int argc, char **argv)
 	top_lvl = new_ir_graph(top_entity, 0);
 	top_store = get_irg_initial_mem(top_lvl);
 
-	flist = new_irg_vector();
+	flist = new_vector();
 
 	file = fopen(argv[1], "r");
 	loop();
