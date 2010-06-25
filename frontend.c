@@ -6,6 +6,7 @@
 
 #include <libfirm/firm.h>
 
+// some macros for type safe vectors
 #define irg_vector_t	vector_t
 #define expr_vector_t	vector_t
 #define str_vector_t	vector_t
@@ -27,20 +28,29 @@ typedef struct vector_t {
 
 // ******************* Global *******************************
 
+// the source file
 FILE *file;
 
+// we only need to get those once
 ir_mode *d_mode;
 ir_type *d_type;
 
+// keeps track of the current store
 ir_node *cur_store;
 
+// contains the top level expressions
 ir_graph *top_lvl;
+// the top level store
 ir_node *top_store;
 
+// in here we keep track of all the functions
 irg_vector_t *flist;
 
+// the identifier string
 char *id_str;
+// contains the value of any numbers
 double num_val;
+// our current token
 int cur_token;
 
 // ************************** Error *****************************
@@ -129,16 +139,18 @@ int next_token()
 
 // ************************** AST ***************************************
 
-typedef enum expr_id {
+// needed to identify the expressions in expr_t
+typedef enum expr_kind {
 	EXPR_NUM,
 	EXPR_VAR,
 	EXPR_BIN,
 	EXPR_CALL,
-} expr_id;
+} expr_kind;
 
+// container struct fur all kinds of expressions
 typedef struct expr_t {
 	void *expr;
-	expr_id which;
+	expr_kind which;
 } expr_t;
 
 typedef struct num_expr_t {
@@ -167,62 +179,64 @@ typedef struct prototype_t {
 } prototype_t;
 
 typedef struct function_t {
-	prototype_t *proto;
+	prototype_t *head;
 	expr_t *body;
 } function_t;
 
-expr_t *new_expr(void *expr, expr_id which)
+// constructors for the various expression structures
+expr_t *new_expr(void *expr, expr_kind which)
 {
-	expr_t *a = malloc(sizeof(expr_t));
-	a->expr = expr;
-	a->which = which;
-	return a;
+	expr_t *e = malloc(sizeof(expr_t));
+	e->expr = expr;
+	e->which = which;
+	return e;
 }
 
 var_expr_t *new_var_expr(char *name)
 {
-	var_expr_t *result = malloc(sizeof(var_expr_t));
-	result->name = name;
-	return result;
+	var_expr_t *var = malloc(sizeof(var_expr_t));
+	var->name = name;
+	return var;
 }
 
 bin_expr_t *new_bin_expr(char op, expr_t *lhs, expr_t *rhs)
 {
-	bin_expr_t *a = malloc(sizeof(bin_expr_t));
-	a->op = op;
-	a->lhs = lhs;
-	a->rhs = rhs;
-	return a;
+	bin_expr_t *bin = malloc(sizeof(bin_expr_t));
+	bin->op = op;
+	bin->lhs = lhs;
+	bin->rhs = rhs;
+	return bin;
 }
 
 call_expr_t *new_call_expr(char *callee, expr_t **argv, int argc)
 {
-	call_expr_t *a = malloc(sizeof(call_expr_t));
-	a->callee = callee;
-	a->argv = argv;
-	a->argc = argc;
-	return a;
+	call_expr_t *call = malloc(sizeof(call_expr_t));
+	call->callee = callee;
+	call->argv = argv;
+	call->argc = argc;
+	return call;
 }
 
 prototype_t *new_prototype(char *name, char **argv, int argc)
 {
-	prototype_t *a = malloc(sizeof(prototype_t));
-	a->name = name;
-	a->argv = argv;
-	a->argc = argc;
-	return a;
+	prototype_t *p = malloc(sizeof(prototype_t));
+	p->name = name;
+	p->argv = argv;
+	p->argc = argc;
+	return p;
 }
 
-function_t *new_function(prototype_t *proto, expr_t *body)
+function_t *new_function(prototype_t *head, expr_t *body)
 {
-	function_t *a = malloc(sizeof(function_t));
-	a->proto = proto;
-	a->body = body;
-	return a;
+	function_t *fn = malloc(sizeof(function_t));
+	fn->head = head;
+	fn->body = body;
+	return fn;
 }
 
 // ****************************** Util **********************************
 
+// maps the parameter names to the corresponding projs
 typedef struct param_list {
 	int n;
 	char **name;
@@ -239,6 +253,7 @@ param_list *new_param_list(int n)
 	return plist;
 }
 
+// returns the corresponding proj for a name, NULL if name is not found
 ir_node *get_from_param_list(param_list *plist, char *name)
 {
 	ir_node *proj = NULL;
@@ -252,6 +267,7 @@ ir_node *get_from_param_list(param_list *plist, char *name)
 	return proj;
 }
 
+// constructor for vectors
 vector_t *new_vector()
 {
 	vector_t *v = malloc(sizeof(vector_t));
@@ -261,6 +277,7 @@ vector_t *new_vector()
 	return v;
 }
 
+// used to push things at the end of the vector
 void push_back(vector_t *v, void *element)
 {
 	v->content[v->p++] = element;
@@ -281,6 +298,7 @@ void push_back(vector_t *v, void *element)
 
 expr_t *parse_expr();
 
+// returns the precedence of the current token
 int get_tok_prec()
 {
 	switch (cur_token) {
@@ -292,6 +310,7 @@ int get_tok_prec()
 	}
 }
 
+// parses an identifier expression
 expr_t *parse_id_expr()
 {
 	char *identifier = id_str;
@@ -344,6 +363,7 @@ expr_t *parse_id_expr()
 	return id_expr;
 }
 
+// parse a number expression
 expr_t *parse_num_expr()
 {
 	num_expr_t *expr = malloc(sizeof(num_expr_t));
@@ -353,6 +373,7 @@ expr_t *parse_num_expr()
 	return new_expr(expr, EXPR_NUM);
 }
 
+// parse a parantheses expression
 expr_t *parse_paren_expr()
 {
 	next_token();		// eat the (
@@ -366,6 +387,7 @@ expr_t *parse_paren_expr()
 	return result;
 }
 
+// parse a primary expression
 expr_t *parse_primary()
 {
 	switch (cur_token) {
@@ -382,6 +404,7 @@ expr_t *parse_primary()
 	}
 }
 
+// parse the right hand side of a binary expression
 expr_t *parse_bin_rhs(int expr_prec, expr_t *lhs)
 {
 	while(1) {
@@ -408,6 +431,7 @@ expr_t *parse_bin_rhs(int expr_prec, expr_t *lhs)
 	}
 }
 
+// parse a prototype
 prototype_t *parse_prototype()
 {
 	prototype_t *prototype = NULL;
@@ -446,6 +470,7 @@ prototype_t *parse_prototype()
 	return prototype;
 }
 
+// parse the definition of a function
 function_t *parse_definition()
 {
 	function_t *fn = NULL;
@@ -463,12 +488,14 @@ function_t *parse_definition()
 	return fn;
 }
 
+// parse a extern prototype
 prototype_t *parse_extern()
 {
 	next_token();
 	return parse_prototype();
 }
 
+// parse a top level expression
 function_t *parse_top_lvl()
 {
 	function_t *fn = NULL;
@@ -482,6 +509,7 @@ function_t *parse_top_lvl()
 	return fn;
 }
 
+// parse an expression
 expr_t *parse_expr()
 {
 	expr_t *lhs = parse_primary();
@@ -494,6 +522,7 @@ expr_t *parse_expr()
 
 ir_node *handle_expr(expr_t *expr, param_list *plist);
 
+// generates the node for a binary expression
 ir_node *handle_bin_expr(bin_expr_t *bin_ex, param_list *plist)
 {
 	// lhs and rhs are both expressions
@@ -518,11 +547,13 @@ ir_node *handle_bin_expr(bin_expr_t *bin_ex, param_list *plist)
 	}
 }
 
+// returns the proj for the given parameter
 ir_node *handle_var_expr(var_expr_t *var, param_list *plist)
 {
 	return get_from_param_list(plist, var->name);
 }
 
+// generates the nodes for the given call expression
 ir_node *handle_call_expr(call_expr_t *call_expr, param_list *plist)
 {
 	printf("DEBUG: call to %s\n", call_expr->callee);
@@ -559,6 +590,7 @@ ir_node *handle_call_expr(call_expr_t *call_expr, param_list *plist)
 	return result;
 }
 
+// decides what to do with the given expression
 ir_node *handle_expr(expr_t *expr, param_list *plist)
 {
 	switch (expr->which) {
@@ -580,19 +612,20 @@ ir_node *handle_expr(expr_t *expr, param_list *plist)
 	}
 }
 
+// creates an ir_graph for the given function
 void func_to_firm(function_t *fn)
 {
-	printf("DEBUG: in function %s\n", fn->proto->name);
+	printf("DEBUG: in function %s\n", fn->head->name);
 	
 	param_list *plist = NULL;
-	int n_param = fn->proto->argc;
+	int n_param = fn->head->argc;
 	// set up the type for the function
 	ir_type *fun_type = new_type_method(n_param, 1);
 	for (int i = 0; i < n_param; i++)
 		set_method_param_type(fun_type, i, d_type);
 	set_method_res_type(fun_type, 0, d_type);
 
-	ir_entity *fun_entity = new_entity(get_glob_type(), new_id_from_str(fn->proto->name), fun_type);
+	ir_entity *fun_entity = new_entity(get_glob_type(), new_id_from_str(fn->head->name), fun_type);
 	// now we can create the graph
 	ir_graph *fun_graph = new_ir_graph(fun_entity, n_param);
 
@@ -607,7 +640,7 @@ void func_to_firm(function_t *fn)
 		plist = new_param_list(n_param);
 
 		for (int i = 0; i < n_param; i++) {
-			plist->name[i] = fn->proto->argv[i];
+			plist->name[i] = fn->head->argv[i];
 			plist->proj[i] = new_Proj(args, d_mode, i);
 		}
 
@@ -628,6 +661,7 @@ void func_to_firm(function_t *fn)
 	dump_ir_block_graph(fun_graph, "");
 }
 
+// adds the given part to the top level ir_graph
 void top_lvl_to_firm(function_t *fn)
 {
 	cur_store = top_store;
@@ -638,6 +672,7 @@ void top_lvl_to_firm(function_t *fn)
 
 // ******************* Main *************************
 
+// our main loop
 int loop()
 {
 	bool err = false;
