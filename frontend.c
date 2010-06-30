@@ -331,7 +331,7 @@ static expr_t *parse_num_expr(void)
 {
 	num_expr_t *expr = calloc(1, sizeof(num_expr_t));
 	expr->val = num_val;
-	//next_token();
+	next_token();
 
 	return new_expr(expr, EXPR_NUM);
 }
@@ -439,7 +439,7 @@ static prototype_t *parse_prototype(void)
 }
 
 // parse the definition of a function
-static void parse_definition(void)
+static bool parse_definition(void)
 {
 	prototype_t *prototype = NULL;
 	expr_t *body = NULL;
@@ -453,17 +453,19 @@ static void parse_definition(void)
 		 function_t *fn = new_function(prototype, body);
 		 fn->next = functions;
 		 functions = fn;
+		 printf("DEBUG: parsed function %s\n", prototype->name);
+		 return true;
+	} else {
+		return false;
 	}
-
-	printf("DEBUG: parsed function %s\n", prototype->name);
 }
 
 // parse a top level expression
-static void parse_top_lvl(void)
+static bool parse_top_lvl(void)
 {
 	expr_t *expr = parse_expr();
 	if (expr == NULL)
-		return;
+		return false;
 
 	if (last_main_fun != NULL) {
 		last_main_fun->next = expr;
@@ -471,10 +473,11 @@ static void parse_top_lvl(void)
 		main_funs = expr;
 	}
 	last_main_fun = expr;
+	return true;
 }
 
 // parse an expression
-static expr_t *parse_expr()
+static expr_t *parse_expr(void)
 {
 	expr_t *lhs = parse_primary();
 	if (!lhs) return NULL;
@@ -492,19 +495,20 @@ static int parser_loop(void)
 		case TOK_EOF:
 			return 0;
 		case TOK_DEF:
-			parse_definition();
+			err = !parse_definition();
 			break;
 		case TOK_EXT:
 			next_token();
-			parse_prototype();
+			err = (parse_prototype() == NULL);
 			break;
 		case ';':
 			next_token();
 			break;
 		default:
-			parse_top_lvl();
+			err = !parse_top_lvl();
 			break;
 		}
+		if (err) error("Unexpected error ;D", "");
 	}
 
 	return -1;
@@ -607,12 +611,14 @@ static ir_node *handle_expr(expr_t *expr, parameter_t *args)
 static void create_func_entities(void)
 {
 	for (function_t *fn = functions; fn != NULL; fn = fn->next) {
-		ir_type *fun_type = new_type_method(fn->head->argc, 1);
-		for (int i = 0; i < fn->head->argc; i++)
-			set_method_param_type(fun_type, i, d_type);
-		set_method_res_type(fun_type, 0, d_type);
+		printf("DEBUG: creating entity for function %s\n", fn->head->name);
 
-		fn->head->ent = new_entity(get_glob_type(), new_id_from_str(fn->head->name), fun_type);
+		ir_type *fn_type = new_type_method(fn->head->argc, 1);
+		for (int i = 0; i < fn->head->argc; i++)
+			set_method_param_type(fn_type, i, d_type);
+		set_method_res_type(fn_type, 0, d_type);
+
+		fn->head->ent = new_entity(get_glob_type(), new_id_from_str(fn->head->name), fn_type);
 	}
 }
 
@@ -688,7 +694,7 @@ int main(int argc, char **argv)
 	if (argc == 2) {
 		file = fopen(argv[1], "r");
 	} else {
-		error("No source file found", "");
+		error("Wrong number of arguments", "");
 		return -1;
 	}
 
