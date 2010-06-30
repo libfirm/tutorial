@@ -8,116 +8,63 @@
 
 // ****************************** Util **********************************
 
-// an unbounded array
-typedef struct vector_t {
-	int p;
-	int size;
-	void **content;
-} vector_t;
+typedef struct parameter_t parameter_t;
 
-// some macros for type safe vectors
-#define irg_vector_t	vector_t
-#define expr_vector_t	vector_t
-#define str_vector_t	vector_t
+struct parameter_t {
+	char *name;
+	ir_node *proj;
 
-#define get_irg(v, i)	\
-	(ir_graph *) v->content[i]
+	parameter_t *next;
+};
 
-#define get_expressions(v)	\
-	(expr_t **) v->content
-
-#define get_strings(v)	\
-	(char **) v->content
-
-// constructor for vectors
-vector_t *new_vector()
+static parameter_t *new_parameter(char *name)
 {
-	vector_t *v = malloc(sizeof(vector_t));
-	v->p = 0;
-	v->size = 5;
-	v->content = malloc(v->size * sizeof(vector_t));
-	return v;
+	parameter_t *p = calloc(1, sizeof(parameter_t));
+	p->name = name;
+	return p;
 }
 
-// used to push things at the end of the vector
-void push_back(vector_t *v, void *element)
+static ir_node *get_arg(parameter_t *params, char *name)
 {
-	v->content[v->p++] = element;
-
-	if (v->p == v->size) {
-		v->size *= 2;
-		void **new = malloc(v->size * sizeof(void *));
-
-		for (int i = 0; i < v->size; i++)
-			new[i] = v->content[i];
-
-		free(v->content);
-		v->content = new;
+	for (parameter_t *p = params; p != NULL; p = p->next) {
+		if (!strcmp(p->name, name)) return p->proj;
 	}
-}
-
-// maps the parameter names to the corresponding projs
-typedef struct param_list {
-	int n;
-	char **name;
-	ir_node **proj;
-} param_list;
-
-param_list *new_param_list(int n)
-{
-	param_list *plist = malloc(sizeof(param_list *));
-	plist->n = n;
-	plist->name = malloc(sizeof(char **) * n);
-	plist->proj = malloc(sizeof(ir_node *) * n);
-
-	return plist;
-}
-
-// returns the corresponding proj for a name, NULL if name is not found
-ir_node *get_from_param_list(param_list *plist, char *name)
-{
-	ir_node *proj = NULL;
-
-	for (int i = 0; i < plist->n; i++) {
-		if (strcmp(name, plist->name[i]) == 0) {
-			proj = plist->proj[i];
-			break;
-		}
-	}
-	return proj;
+	return NULL;
 }
 
 // ******************* Global *******************************
 
+typedef struct expr_t expr_t;
+typedef struct prototype_t prototype_t;
+typedef struct function_t function_t;
+
 // the source file
-FILE *file;
+static FILE *file;
 
 // we only need to get those once
-ir_mode *d_mode;
-ir_type *d_type;
+static ir_mode *d_mode;
+static ir_type *d_type;
 
 // keeps track of the current store
-ir_node *cur_store;
+static ir_node *cur_store;
 
-// contains the top level expressions
-ir_graph *top_lvl;
-// the top level store
-ir_node *top_store;
-
-// in here we keep track of all the functions
-irg_vector_t *flist;
+//NEW
+static expr_t *main_funs;
+static expr_t *last_main_fun;
+static prototype_t *prototypes;
+static function_t *functions;
 
 // the identifier string
-char *id_str;
+static char *id_str;
 // contains the value of any numbers
-double num_val;
+static double num_val;
 // our current token
-int cur_token;
+static int cur_token;
 
 // ************************** Error *****************************
 
 // obvious ;D
-void error(char *msg, char *info)
+static void error(char *msg, char *info)
 {
 	fprintf(stderr, "Error: %s%s.\n", msg, info);
 }
@@ -134,7 +81,7 @@ enum token_t {
 };
 
 // Returns the current token
-int get_token()
+static int get_token(void)
 {
 	int ret = 0;
 	static int ch = ' ';
@@ -157,7 +104,7 @@ int get_token()
 		else if (strcmp(buffer, "extern") == 0)
 			ret = TOK_EXT;
 		else {
-			id_str = malloc((strlen(buffer) + 1) * sizeof(char));
+			id_str = calloc(strlen(buffer) + 1, sizeof(char));
 			strcpy(id_str, buffer);
 			ret = TOK_ID;
 		}
@@ -192,7 +139,7 @@ int get_token()
 }
 
 // wrapper around get_token()
-int next_token()
+static int next_token(void)
 {
 	cur_token = get_token();
 	return cur_token;
@@ -209,10 +156,12 @@ typedef enum expr_kind {
 } expr_kind;
 
 // container struct fur all kinds of expressions
-typedef struct expr_t {
+struct expr_t {
 	void *expr;
 	expr_kind which;
-} expr_t;
+
+	expr_t *next;
+};
 
 // structs representing the different kinds of expressions
 typedef struct num_expr_t {
@@ -230,78 +179,83 @@ typedef struct bin_expr_t {
 
 typedef struct call_expr_t {
 	char *callee;
-	expr_t **argv;
+	expr_t *args;
 	int argc;
 } call_expr_t;
 
-typedef struct prototype_t {
+struct prototype_t {
 	char *name;
-	char **argv;
+	parameter_t *args;
 	int argc;
-} prototype_t;
+	ir_entity *ent;
 
-typedef struct function_t {
+	prototype_t *next;
+};
+
+struct function_t {
 	prototype_t *head;
 	expr_t *body;
-} function_t;
+
+	function_t *next;
+};
 
 // constructors for the various expression structures
-expr_t *new_expr(void *expr, expr_kind which)
+static expr_t *new_expr(void *expr, expr_kind which)
 {
-	expr_t *e = malloc(sizeof(expr_t));
+	expr_t *e = calloc(1, sizeof(expr_t));
 	e->expr = expr;
 	e->which = which;
 	return e;
 }
 
-var_expr_t *new_var_expr(char *name)
+static var_expr_t *new_var_expr(char *name)
 {
-	var_expr_t *var = malloc(sizeof(var_expr_t));
-	var->name = name;
-	return var;
+	var_expr_t *v = calloc(1, sizeof(var_expr_t));
+	v->name = name;
+	return v;
 }
 
-bin_expr_t *new_bin_expr(char op, expr_t *lhs, expr_t *rhs)
+static bin_expr_t *new_bin_expr(char op, expr_t *lhs, expr_t *rhs)
 {
-	bin_expr_t *bin = malloc(sizeof(bin_expr_t));
-	bin->op = op;
-	bin->lhs = lhs;
-	bin->rhs = rhs;
-	return bin;
+	bin_expr_t *b = calloc(1, sizeof(bin_expr_t));
+	b->op = op;
+	b->lhs = lhs;
+	b->rhs = rhs;
+	return b;
 }
 
-call_expr_t *new_call_expr(char *callee, expr_t **argv, int argc)
+static call_expr_t *new_call_expr(char *callee, expr_t *args, int argc)
 {
-	call_expr_t *call = malloc(sizeof(call_expr_t));
-	call->callee = callee;
-	call->argv = argv;
-	call->argc = argc;
-	return call;
+	call_expr_t *c = calloc(1, sizeof(call_expr_t));
+	c->callee = callee;
+	c->args = args;
+	c->argc = argc;
+	return c;	
 }
 
-prototype_t *new_prototype(char *name, char **argv, int argc)
+static prototype_t *new_prototype(char *name, parameter_t *args, int argc)
 {
-	prototype_t *p = malloc(sizeof(prototype_t));
+	prototype_t *p = calloc(1, sizeof(prototype_t));
 	p->name = name;
-	p->argv = argv;
+	p->args = args;
 	p->argc = argc;
 	return p;
 }
 
-function_t *new_function(prototype_t *head, expr_t *body)
+static function_t *new_function(prototype_t *head, expr_t *body)
 {
-	function_t *fn = malloc(sizeof(function_t));
-	fn->head = head;
-	fn->body = body;
-	return fn;
+	function_t *f = calloc(1, sizeof(function_t));
+	f->head = head;
+	f->body = body;
+	return f;
 }
 
 // ********************* Parser *************************
 
-expr_t *parse_expr();
+static expr_t *parse_expr(void);
 
 // returns the precedence of the current token
-int get_tok_prec()
+static int get_tok_prec(void)
 {
 	switch (cur_token) {
 	default: return -1;
@@ -312,22 +266,32 @@ int get_tok_prec()
 	}
 }
 
+static bool check_call(call_expr_t *call)
+{
+	for (prototype_t *p = prototypes; p != NULL; p = p->next) {
+		if (!strcmp(call->callee, p->name) && call->argc == p->argc)
+			return true;
+	}
+	return false;
+}
+
 // parses an identifier expression
-expr_t *parse_id_expr()
+static expr_t *parse_id_expr(void)
 {
 	char *identifier = id_str;
 	expr_t *id_expr = NULL;
-	expr_vector_t *args = NULL;
-	bool arg_error = false;
 
 	next_token();
 
-	if (cur_token != '(') {
+	if (cur_token != '(') {	// it's not a call
 		id_expr = new_expr(new_var_expr(identifier), EXPR_VAR);
-	} else {
+	} else {	// it's a call
+		call_expr_t *call;
+		expr_t *args = NULL;
+		int c = 0;
+
 		next_token();
 		if (cur_token != ')') {
-			args = new_vector();
 			while (1) {
 				expr_t *e = parse_expr();
 
@@ -336,14 +300,15 @@ expr_t *parse_id_expr()
 					break;
 				}
 
-				push_back(args, e);
+				e->next = args;
+				args = e;
+				c++;
 
 				if (cur_token == ')')
 					break;
 
 				if (cur_token != ',') {
 					error("Expected ')' or ',' in argument list", "");
-					arg_error = true;
 					break;
 				}
 				
@@ -353,22 +318,18 @@ expr_t *parse_id_expr()
 
 		next_token();
 
-		if (args != NULL) {
-			if (!arg_error)
-				id_expr = new_expr(new_call_expr(identifier, get_expressions(args), args->p), EXPR_CALL);
-			free(args);
-		} else {
-			id_expr = new_expr(new_call_expr(identifier, NULL, 0), EXPR_CALL);
-		}
+		call = new_call_expr(identifier, args, c);
+		if (check_call(call))
+			id_expr = new_expr(call, EXPR_CALL);
 	}
 
 	return id_expr;
 }
 
 // parse a number expression
-expr_t *parse_num_expr()
+static expr_t *parse_num_expr(void)
 {
-	num_expr_t *expr = malloc(sizeof(num_expr_t));
+	num_expr_t *expr = calloc(1, sizeof(num_expr_t));
 	expr->val = num_val;
 	//next_token();
 
@@ -376,7 +337,7 @@ expr_t *parse_num_expr()
 }
 
 // parse a parantheses expression
-expr_t *parse_paren_expr()
+static expr_t *parse_paren_expr(void)
 {
 	next_token();		// eat the (
 	expr_t *result = parse_expr();
@@ -390,7 +351,7 @@ expr_t *parse_paren_expr()
 }
 
 // parse a primary expression
-expr_t *parse_primary()
+static expr_t *parse_primary(void)
 {
 	switch (cur_token) {
 	case TOK_ID:
@@ -409,7 +370,7 @@ expr_t *parse_primary()
 }
 
 // parse the right hand side of a binary expression
-expr_t *parse_bin_rhs(int expr_prec, expr_t *lhs)
+static expr_t *parse_bin_rhs(int expr_prec, expr_t *lhs)
 {
 	while(1) {
 		int tok_prec = get_tok_prec();
@@ -436,10 +397,11 @@ expr_t *parse_bin_rhs(int expr_prec, expr_t *lhs)
 }
 
 // parse a prototype
-prototype_t *parse_prototype()
+static prototype_t *parse_prototype(void)
 {
-	prototype_t *prototype = NULL;
-	str_vector_t *arg_names = NULL;
+	prototype_t *proto = NULL;
+	parameter_t *args = NULL;
+	int argc;
 	char *fn_name = NULL;
 
 	if (cur_token != TOK_ID) {
@@ -451,33 +413,34 @@ prototype_t *parse_prototype()
 		if (cur_token != '(') {
 			error("Expected '(' in prototype", "");
 		} else {
-			arg_names = new_vector();
-	
-			while (next_token() == TOK_ID)
-				push_back(arg_names, id_str);
-
+			while (next_token() == TOK_ID) {
+				parameter_t *arg = new_parameter(id_str);
+				arg->next = args;
+				args = arg;
+				argc++;
+			}
 			if (cur_token != ')') {
 				error("Expected ')' in prototype", "");
-				free(arg_names);
-				arg_names = NULL;
+				args = NULL;
 			}
 		}
 	}
 
 	next_token();
 
-	if (arg_names != NULL) {
-		prototype = new_prototype(fn_name, get_strings(arg_names), arg_names->p);
-		free(arg_names);
-	}
+	proto = new_prototype(fn_name, args, argc);
 
-	return prototype;
+	proto->next = prototypes;
+	prototypes = proto;
+
+	printf("DEBUG: parsed prototype of %s\n", proto->name);
+
+	return proto;
 }
 
 // parse the definition of a function
-function_t *parse_definition()
+static void parse_definition(void)
 {
-	function_t *fn = NULL;
 	prototype_t *prototype = NULL;
 	expr_t *body = NULL;
 	
@@ -486,35 +449,32 @@ function_t *parse_definition()
 	prototype = parse_prototype();
 	body = parse_expr();
 
-	if (prototype != NULL && body != NULL)
-		fn = new_function(prototype, body);
+	if (prototype != NULL && body != NULL) {
+		 function_t *fn = new_function(prototype, body);
+		 fn->next = functions;
+		 functions = fn;
+	}
 
-	return fn;
-}
-
-// parse a extern prototype
-prototype_t *parse_extern()
-{
-	next_token();
-	return parse_prototype();
+	printf("DEBUG: parsed function %s\n", prototype->name);
 }
 
 // parse a top level expression
-function_t *parse_top_lvl()
+static void parse_top_lvl(void)
 {
-	function_t *fn = NULL;
 	expr_t *expr = parse_expr();
+	if (expr == NULL)
+		return;
 
-	if (expr != NULL) {
-		prototype_t *prototype = new_prototype("", NULL, 0);
-		fn = new_function(prototype, expr);
+	if (last_main_fun != NULL) {
+		last_main_fun->next = expr;
+	} else {
+		main_funs = expr;
 	}
-
-	return fn;
+	last_main_fun = expr;
 }
 
 // parse an expression
-expr_t *parse_expr()
+static expr_t *parse_expr()
 {
 	expr_t *lhs = parse_primary();
 	if (!lhs) return NULL;
@@ -522,16 +482,44 @@ expr_t *parse_expr()
 	return parse_bin_rhs(0, lhs);
 }
 
+// the main parser loop
+static int parser_loop(void)
+{
+	bool err = false;
+	while (!err) {
+		next_token();
+		switch (cur_token) {
+		case TOK_EOF:
+			return 0;
+		case TOK_DEF:
+			parse_definition();
+			break;
+		case TOK_EXT:
+			next_token();
+			parse_prototype();
+			break;
+		case ';':
+			next_token();
+			break;
+		default:
+			parse_top_lvl();
+			break;
+		}
+	}
+
+	return -1;
+}
+
 // ********************* to firm ***********************
 
-ir_node *handle_expr(expr_t *expr, param_list *plist);
+static ir_node *handle_expr(expr_t *expr, parameter_t *args);
 
 // generates the node for a binary expression
-ir_node *handle_bin_expr(bin_expr_t *bin_ex, param_list *plist)
+static ir_node *handle_bin_expr(bin_expr_t *bin_ex, parameter_t *args)
 {
 	// lhs and rhs are both expressions
-	ir_node *lhs = handle_expr(bin_ex->lhs, plist);
-	ir_node *rhs = handle_expr(bin_ex->rhs, plist);
+	ir_node *lhs = handle_expr(bin_ex->lhs, args);
+	ir_node *rhs = handle_expr(bin_ex->rhs, args);
 
 	switch (bin_ex->op) {
 	case '<':
@@ -552,50 +540,51 @@ ir_node *handle_bin_expr(bin_expr_t *bin_ex, param_list *plist)
 }
 
 // returns the proj for the given parameter
-ir_node *handle_var_expr(var_expr_t *var, param_list *plist)
+static ir_node *handle_var_expr(var_expr_t *var, parameter_t *args)
 {
-	return get_from_param_list(plist, var->name);
+	return get_arg(args, var->name);
 }
 
 // generates the nodes for the given call expression
-ir_node *handle_call_expr(call_expr_t *call_expr, param_list *plist)
+static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 {
-	printf("DEBUG: call to %s\n", call_expr->callee);
+	printf("DEBUG: call to %s\n", call->callee);
 
 	ir_node *callee = NULL;
-	ir_entity *ent = NULL;
 	ir_node **in = NULL;
 	ir_node *result = NULL;
+	ir_entity *ent = NULL;
 
-	if (call_expr->argc > 0)
-		in = malloc(sizeof(ir_node **) * call_expr->argc);
+	if (call->argc > 0)
+		in = calloc(call->argc, sizeof(ir_node **));
 
-	for (int i = 0; i < flist->p; i++) {
-		ent = get_irg_entity(get_irg(flist, i));
-
-		if (!strcmp(get_entity_name(ent), call_expr->callee)) {
+	for (prototype_t *p = prototypes; p != NULL; p = p->next) {
+		if (!strcmp(p->name, call->callee) && p->argc == call->argc) {
+			ent = p->ent;
 			callee = new_SymConst(get_modeP(), (symconst_symbol) ent, symconst_addr_ent);
 			break;
 		}
 	}
 
 	if (callee != NULL) {
-		for (int i = 0; i < call_expr->argc; i++)
-			in[i] = handle_expr(call_expr->argv[i], plist);
+		int i = 0;
+		for (expr_t *e = call->args; e != NULL; e = e->next) {
+			in[i++] = handle_expr(e, args);
+		}
 
-		ir_node *call = new_Call(cur_store, callee, call_expr->argc, in, get_entity_type(ent));
-		cur_store = new_Proj(call, get_modeM(), pn_Generic_M);
-		ir_node *tup = new_Proj(call, get_modeT(), pn_Call_T_result);
+		ir_node *call_node = new_Call(cur_store, callee, call->argc, in, get_entity_type(ent));
+		cur_store = new_Proj(call_node, get_modeM(), pn_Generic_M);
+		ir_node *tup = new_Proj(call_node, get_modeT(), pn_Call_T_result);
 		result = new_Proj(tup, d_mode, 0);
 	} else {
-		error("Cannot call unknown function: ", call_expr->callee);
+		error("Cannot call unknown function: ", call->callee);
 	}
 
 	return result;
 }
 
 // decides what to do with the given expression
-ir_node *handle_expr(expr_t *expr, param_list *plist)
+static ir_node *handle_expr(expr_t *expr, parameter_t *args)
 {
 	switch (expr->which) {
 	case EXPR_NUM:
@@ -604,133 +593,115 @@ ir_node *handle_expr(expr_t *expr, param_list *plist)
 		return new_Const(new_tarval_from_double(num->val, d_mode));
 	}
 	case EXPR_BIN:
-		return handle_bin_expr((bin_expr_t *) expr->expr, plist);
-		// TODO? return proj auf ergebnis ?????
+		return handle_bin_expr((bin_expr_t *) expr->expr, args);
 	case EXPR_VAR:
-		return handle_var_expr((var_expr_t *) expr->expr, plist);	
+		return handle_var_expr((var_expr_t *) expr->expr, args);	
 	case EXPR_CALL:
-		return handle_call_expr((call_expr_t *) expr->expr, plist);
-		// auch proj ?
+		return handle_call_expr((call_expr_t *) expr->expr, args);
 	default:
 		return NULL;
 	}
 }
 
-// creates an ir_graph for the given function
-void func_to_firm(function_t *fn)
+// creates the entities to all functions
+static void create_func_entities(void)
 {
-	printf("DEBUG: in function %s\n", fn->head->name);
-	
-	param_list *plist = NULL;
-	int n_param = fn->head->argc;
-	// set up the type for the function
-	ir_type *fun_type = new_type_method(n_param, 1);
-	for (int i = 0; i < n_param; i++)
-		set_method_param_type(fun_type, i, d_type);
-	set_method_res_type(fun_type, 0, d_type);
+	for (function_t *fn = functions; fn != NULL; fn = fn->next) {
+		ir_type *fun_type = new_type_method(fn->head->argc, 1);
+		for (int i = 0; i < fn->head->argc; i++)
+			set_method_param_type(fun_type, i, d_type);
+		set_method_res_type(fun_type, 0, d_type);
 
-	ir_entity *fun_entity = new_entity(get_glob_type(), new_id_from_str(fn->head->name), fun_type);
-	// now we can create the graph
-	ir_graph *fun_graph = new_ir_graph(fun_entity, n_param);
+		fn->head->ent = new_entity(get_glob_type(), new_id_from_str(fn->head->name), fun_type);
+	}
+}
 
-	// set cur_store
-	cur_store = get_irg_initial_mem(fun_graph);
-	// create the projs for the parameters
-	if (n_param > 0) {
-		ir_node *b = get_irg_current_block(fun_graph);
-		set_irg_current_block(fun_graph, get_irg_start_block(fun_graph));
+// creates an ir_graph for the given function
+static void create_func_graphs(void)
+{
+	for (function_t *fn = functions; fn != NULL; fn = fn->next) {
+		printf("DEBUG: in function %s\n", fn->head->name);
+		
+		int n_param = fn->head->argc;
+		ir_graph *fun_graph = new_ir_graph(fn->head->ent, n_param);
 
-		ir_node *args = get_irg_args(fun_graph);
-		// initialize the parameter list
-		plist = new_param_list(n_param);
-		for (int i = 0; i < n_param; i++) {
-			plist->name[i] = fn->head->argv[i];
-			plist->proj[i] = new_Proj(args, d_mode, i);
+		// set cur_store
+		cur_store = get_irg_initial_mem(fun_graph);
+		// create the projs for the parameters
+		if (n_param > 0) {
+			ir_node *block = get_irg_current_block(fun_graph);
+			set_irg_current_block(fun_graph, get_irg_start_block(fun_graph));
+
+			ir_node *args = get_irg_args(fun_graph);
+			// initialize the parameter list
+			int i = 0;
+			for (parameter_t *p = fn->head->args; p != NULL; p = p->next) {
+				p->proj = new_Proj(args, d_mode, i++);
+			}
+
+			set_irg_current_block(fun_graph, block);
 		}
 
-		set_irg_current_block(fun_graph, b);
+		// handle the function body
+		ir_node *node = handle_expr(fn->body, fn->head->args);
+		ir_node **result = &node; 
+		ir_node *ret = new_Return(cur_store, 1, result);
+		mature_immBlock(get_irg_current_block(fun_graph));
+
+		ir_node *end = get_irg_end_block(fun_graph);
+		add_immBlock_pred(end, ret);
+		mature_immBlock(end);
+
+		// push the function on the function list and dump it
+		dump_ir_block_graph(fun_graph, "");
+	}
+}
+
+// create the main graph
+static void create_main(void)
+{
+	ir_entity *ent = new_entity(get_glob_type(), new_id_from_str("main"), new_type_method(0, 0));
+	ir_graph *fn_main = new_ir_graph(ent, 0);
+	cur_store = get_irg_initial_mem(fn_main);
+
+	for (expr_t *e = main_funs; e != NULL; e = e->next) {
+		handle_expr(e, NULL);
 	}
 
-	// handle the function body
-	ir_node *node = handle_expr(fn->body, plist);
-	ir_node **result = &node; 
-	ir_node *ret = new_Return(cur_store, 1, result);
-	mature_immBlock(get_irg_current_block(fun_graph));
-
-	ir_node *end = get_irg_end_block(fun_graph);
-	add_immBlock_pred(end, ret);
-	mature_immBlock(end);
-
-	// push the function on the function list and dump it
-	push_back(flist, fun_graph);
-	dump_ir_block_graph(fun_graph, "");
+	ir_node *ret = new_Return(cur_store, 0, NULL);
+	add_immBlock_pred(get_irg_end_block(fn_main), ret);
+	mature_immBlock(get_irg_end_block(fn_main));
+	// set it as the main function
+	set_irp_main_irg(fn_main);
+	// and dump it
+	dump_ir_block_graph(fn_main, "");
 }
 
-// adds the given part to the top level ir_graph
-void top_lvl_to_firm(function_t *fn)
-{
-	cur_store = top_store;
-	set_current_ir_graph(top_lvl);
-	handle_expr(fn->body, NULL);
-	top_store = cur_store;
-}
+// ******************* Memory ***********************
+
 
 // ******************* Main *************************
 
-// our main loop
-int loop()
-{
-	bool err = false;
-	while (!err) {
-		function_t *fn = NULL;
-		next_token();
-		switch (cur_token) {
-		case TOK_EOF:
-			return 0;
-		case TOK_DEF:
-			fn = parse_definition();
-			func_to_firm(fn);
-			break;
-		case ';':
-			next_token();
-			break;
-		default:
-			fn = parse_top_lvl();
-			top_lvl_to_firm(fn);
-			break;
-		}
-	}
-
-	return -1;
-}
-
 int main(int argc, char **argv)
 {
+	// open the source file and run the parser loop
+	if (argc == 2) {
+		file = fopen(argv[1], "r");
+	} else {
+		error("No source file found", "");
+		return -1;
+	}
+
+	parser_loop();
+
 	ir_init(NULL);
 	new_ir_prog("kaleidoscope");
 	d_mode = get_modeD();
 	d_type = new_type_primitive(d_mode);
-	
-	// prepare the top level ir_graph
-	ir_type *top_type = new_type_method(0, 0);
-	ir_entity *top_entity = new_entity(get_glob_type(), new_id_from_str("main"), top_type);
-	top_lvl = new_ir_graph(top_entity, 0);
-	top_store = get_irg_initial_mem(top_lvl);
 
-	// initialize the file list, open the source file and run the main loop
-	flist = new_vector();
-	file = fopen(argv[1], "r");
-	loop();
-
-	// finish the top level ir_graph
-	set_current_ir_graph(top_lvl);
-	ir_node *ret = new_Return(top_store, 0, NULL);
-	add_immBlock_pred(get_irg_end_block(top_lvl), ret);
-	mature_immBlock(get_irg_end_block(top_lvl));
-	// set it as the main function
-	set_irp_main_irg(top_lvl);
-	// and dump it
-	dump_ir_block_graph(top_lvl, "");
+	create_func_entities();
+	create_func_graphs();
+	create_main();
 
 	ir_finish();
 	return 0;
