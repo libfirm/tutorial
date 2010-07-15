@@ -6,34 +6,6 @@
 
 #include <libfirm/firm.h>
 
-// ****************************** Util **********************************
-
-typedef struct parameter_t parameter_t;
-
-struct parameter_t {
-	char *name;
-	ir_node *proj;
-
-	parameter_t *next;
-};
-
-static parameter_t *new_parameter(char *name)
-{
-	parameter_t *p = calloc(1, sizeof(parameter_t));
-	p->name = name;
-	return p;
-}
-
-static ir_node *get_arg(parameter_t *params, char *name)
-{
-	for (parameter_t *p = params; p != NULL; p = p->next) {
-		if (!strcmp(p->name, name)) return p->proj;
-	}
-	return NULL;
-}
-
-// ******************* Global *******************************
-
 typedef struct expr_t expr_t;
 typedef struct prototype_t prototype_t;
 typedef struct function_t function_t;
@@ -87,31 +59,41 @@ static int get_token(void)
 	static int ch = ' ';
 	char buffer[256];
 
+	printf("DEBUG: Lexer: ");
 	// Skip whitespace
 	while (isspace(ch))
 		ch = fgetc(file);
 		
+	// keyword or identifier
 	if (isalpha(ch)) {
 		int i = 0;
 		do {
+			printf("%c", ch); //DEBUG
 			buffer[i++] = ch;
 			ch = fgetc(file);
 		} while (isalnum(ch));
 		buffer[i] = '\0';
 
-		if (strcmp(buffer, "def") == 0)
+		if (strcmp(buffer, "def") == 0) {
 			ret = TOK_DEF;
-		else if (strcmp(buffer, "extern") == 0)
+			printf("\t\t\tdef"); // DEBUG
+		}
+		else if (strcmp(buffer, "extern") == 0) {
 			ret = TOK_EXT;
+			printf("\t\t\textern"); // DEBUG
+		}
 		else {
 			id_str = calloc(strlen(buffer) + 1, sizeof(char));
 			strcpy(id_str, buffer);
 			ret = TOK_ID;
+			printf("\t\t\tid"); // DEBUG
 		}
+	// number
 	} else if (isdigit(ch)) {
 		int i = 0;
 
 		do {
+			printf("%c", ch); // DEBUG
 			buffer[i++] = ch;
 			ch = fgetc(file);
 		} while (isdigit(ch) || ch == '.');
@@ -119,8 +101,9 @@ static int get_token(void)
 
 		num_val = atof(buffer);
 		ret = TOK_NUM;
+		printf("\t\t\tnumber"); // DEBUG
+	// comments, not yet tested!
 	} else if (ch == '#') {
-		// skip comments
 		do ch = fgetc(file);
 		while (ch != EOF && ch != '\n' && ch != '\r');
 
@@ -131,9 +114,11 @@ static int get_token(void)
 	} else if (ch == EOF)
 		ret = TOK_EOF;
 	else {
+		printf("%c\t\t\twhatever", ch); // DEBUG
 		ret = ch;
 		ch = fgetc(file);
 	}
+	printf("\n");	// DEBUG
 
 	return ret;
 }
@@ -182,6 +167,30 @@ typedef struct call_expr_t {
 	expr_t *args;
 	int argc;
 } call_expr_t;
+
+typedef struct parameter_t parameter_t;
+
+struct parameter_t {
+	char *name;
+	ir_node *proj;
+
+	parameter_t *next;
+};
+
+static parameter_t *new_parameter(char *name)
+{
+	parameter_t *p = calloc(1, sizeof(parameter_t));
+	p->name = name;
+	return p;
+}
+
+static ir_node *get_arg(parameter_t *params, char *name)
+{
+	for (parameter_t *p = params; p != NULL; p = p->next) {
+		if (!strcmp(p->name, name)) return p->proj;
+	}
+	return NULL;
+}
 
 struct prototype_t {
 	char *name;
@@ -508,7 +517,7 @@ static int parser_loop(void)
 			err = !parse_top_lvl();
 			break;
 		}
-		if (err) error("Unexpected error ;D", "");
+		if (err) error("Unexpected Parser Error!", "");
 	}
 
 	return -1;
@@ -578,8 +587,8 @@ static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 
 		ir_node *call_node = new_Call(cur_store, callee, call->argc, in, get_entity_type(ent));
 		cur_store = new_Proj(call_node, get_modeM(), pn_Generic_M);
-		ir_node *tup = new_Proj(call_node, get_modeT(), pn_Call_T_result);
-		result = new_Proj(tup, d_mode, 0);
+		ir_node *tuple = new_Proj(call_node, get_modeT(), pn_Call_T_result);
+		result = new_Proj(tuple, d_mode, 0);
 	} else {
 		error("Cannot call unknown function: ", call->callee);
 	}
