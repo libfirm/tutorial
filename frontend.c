@@ -21,8 +21,8 @@ static ir_type *d_type;
 static ir_node *cur_store;
 
 //NEW
-static expr_t *main_funs;
-static expr_t *last_main_fun;
+static expr_t *main_exprs;
+static expr_t *last_main_expr;
 static prototype_t *prototypes;
 static function_t *functions;
 
@@ -59,7 +59,7 @@ static int get_token(void)
 	static int ch = ' ';
 	char buffer[256];
 
-	printf("DEBUG: Lexer: ");
+	//printf("DEBUG: Lexer: ");
 	// Skip whitespace
 	while (isspace(ch))
 		ch = fgetc(file);
@@ -68,7 +68,7 @@ static int get_token(void)
 	if (isalpha(ch)) {
 		int i = 0;
 		do {
-			printf("%c", ch); //DEBUG
+			//printf("%c", ch); //DEBUG
 			buffer[i++] = ch;
 			ch = fgetc(file);
 		} while (isalnum(ch));
@@ -76,24 +76,24 @@ static int get_token(void)
 
 		if (strcmp(buffer, "def") == 0) {
 			ret = TOK_DEF;
-			printf("\t\t\tdef"); // DEBUG
+			//printf("\t\t\tdef"); // DEBUG
 		}
 		else if (strcmp(buffer, "extern") == 0) {
 			ret = TOK_EXT;
-			printf("\t\t\textern"); // DEBUG
+			//printf("\t\t\textern"); // DEBUG
 		}
 		else {
 			id_str = calloc(strlen(buffer) + 1, sizeof(char));
 			strcpy(id_str, buffer);
 			ret = TOK_ID;
-			printf("\t\t\tid"); // DEBUG
+			//printf("\t\t\tid"); // DEBUG
 		}
 	// number
 	} else if (isdigit(ch)) {
 		int i = 0;
 
 		do {
-			printf("%c", ch); // DEBUG
+			//printf("%c", ch); // DEBUG
 			buffer[i++] = ch;
 			ch = fgetc(file);
 		} while (isdigit(ch) || ch == '.');
@@ -101,8 +101,8 @@ static int get_token(void)
 
 		num_val = atof(buffer);
 		ret = TOK_NUM;
-		printf("\t\t\tnumber"); // DEBUG
-	// comments, not yet tested!
+		//printf("\t\t\tnumber"); // DEBUG
+	// ignore comments
 	} else if (ch == '#') {
 		do ch = fgetc(file);
 		while (ch != EOF && ch != '\n' && ch != '\r');
@@ -114,11 +114,11 @@ static int get_token(void)
 	} else if (ch == EOF)
 		ret = TOK_EOF;
 	else {
-		printf("%c\t\t\twhatever", ch); // DEBUG
+		//printf("%c\t\t\twhatever", ch); // DEBUG
 		ret = ch;
 		ch = fgetc(file);
 	}
-	printf("\n");	// DEBUG
+	//printf("\n");	// DEBUG
 
 	return ret;
 }
@@ -330,7 +330,7 @@ static expr_t *parse_id_expr(void)
 		call = new_call_expr(identifier, args, c);
 		if (check_call(call)) {
 			id_expr = new_expr(call, EXPR_CALL);
-			printf("DEBUG: Parsed a call\n");
+			//printf("DEBUG: Parsed a call\n");
 		}
 	}
 
@@ -437,7 +437,7 @@ static prototype_t *parse_prototype(void)
 		}
 	}
 
-	printf("DEBUG: parsed prototype of %s\n", fn_name);
+	//printf("DEBUG: parsed prototype of %s\n", fn_name);
 	next_token();
 
 	proto = new_prototype(fn_name, args, argc);
@@ -463,7 +463,7 @@ static bool parse_definition(void)
 		 function_t *fn = new_function(prototype, body);
 		 fn->next = functions;
 		 functions = fn;
-		 printf("DEBUG: parsed function %s\n", prototype->name);
+		 //printf("DEBUG: parsed function %s\n", prototype->name);
 		 return true;
 	} else {
 		return false;
@@ -477,12 +477,12 @@ static bool parse_top_lvl(void)
 	if (expr == NULL)
 		return false;
 
-	if (last_main_fun != NULL) {
-		last_main_fun->next = expr;
+	if (last_main_expr != NULL) {
+		last_main_expr->next = expr;
 	} else {
-		main_funs = expr;
+		main_exprs = expr;
 	}
-	last_main_fun = expr;
+	last_main_expr = expr;
 	return true;
 }
 
@@ -500,8 +500,8 @@ static bool parser_loop(void)
 {
 	bool err = false;
 	next_token();
+	// parse the file till we reach the end
 	while (!err) {
-		//next_token();
 		switch (cur_token) {
 		case TOK_EOF:
 			return true;
@@ -522,6 +522,7 @@ static bool parser_loop(void)
 		if (err) error("Unexpected Parser Error!", "");
 	}
 
+	// an error occurred
 	return false;
 }
 
@@ -563,7 +564,7 @@ static ir_node *handle_var_expr(var_expr_t *var, parameter_t *args)
 // generates the nodes for the given call expression
 static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 {
-	printf("DEBUG: call to %s\n", call->callee);
+	//printf("DEBUG: call to %s\n", call->callee);
 
 	ir_node *callee = NULL;
 	ir_node **in = NULL;
@@ -595,6 +596,9 @@ static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 		error("Cannot call unknown function: ", call->callee);
 	}
 
+	if (in != NULL) {
+		free(in);
+	}
 	return result;
 }
 
@@ -622,7 +626,7 @@ static ir_node *handle_expr(expr_t *expr, parameter_t *args)
 static void create_func_entities(void)
 {
 	for (function_t *fn = functions; fn != NULL; fn = fn->next) {
-		printf("DEBUG: creating entity for function %s\n", fn->head->name);
+		//printf("DEBUG: creating entity for function %s\n", fn->head->name);
 
 		ir_type *fn_type = new_type_method(fn->head->argc, 1);
 		for (int i = 0; i < fn->head->argc; i++)
@@ -637,7 +641,7 @@ static void create_func_entities(void)
 static void create_func_graphs(void)
 {
 	for (function_t *fn = functions; fn != NULL; fn = fn->next) {
-		printf("DEBUG: in function %s\n", fn->head->name);
+		//printf("DEBUG: in function %s\n", fn->head->name);
 		
 		int n_param = fn->head->argc;
 		ir_graph *fun_graph = new_ir_graph(fn->head->ent, n_param);
@@ -669,7 +673,7 @@ static void create_func_graphs(void)
 		add_immBlock_pred(end, ret);
 		mature_immBlock(end);
 
-		// push the function on the function list and dump it
+		// dump the graph
 		dump_ir_block_graph(fun_graph, "");
 	}
 }
@@ -677,15 +681,19 @@ static void create_func_graphs(void)
 // create the main graph
 static void create_main(void)
 {
-	ir_entity *ent = new_entity(get_glob_type(), new_id_from_str("main"), new_type_method(0, 0));
+	ir_type *type = new_type_method(0, 1);
+	set_method_res_type(type, 0, d_type);
+	ir_entity *ent = new_entity(get_glob_type(), new_id_from_str("main"), type);
 	ir_graph *fn_main = new_ir_graph(ent, 0);
 	cur_store = get_irg_initial_mem(fn_main);
 
-	for (expr_t *e = main_funs; e != NULL; e = e->next) {
-		handle_expr(e, NULL);
+	ir_node *node = NULL;
+	for (expr_t *e = main_exprs; e != NULL; e = e->next) {
+		node = handle_expr(e, NULL);
 	}
 
-	ir_node *ret = new_Return(cur_store, 0, NULL);
+	ir_node **result = &node;
+	ir_node *ret = new_Return(cur_store, 1, result);
 	add_immBlock_pred(get_irg_end_block(fn_main), ret);
 	mature_immBlock(get_irg_end_block(fn_main));
 	// set it as the main function
@@ -694,14 +702,12 @@ static void create_main(void)
 	dump_ir_block_graph(fn_main, "");
 }
 
-// ******************* Memory ***********************
-
 
 // ******************* Main *************************
 
 int main(int argc, char **argv)
 {
-	// open the source file and run the parser loop
+	// open the source file
 	if (argc == 2) {
 		file = fopen(argv[1], "r");
 	} else {
@@ -709,7 +715,9 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	// run the parser loop
 	if (parser_loop()) {
+		// create the libfirm stuff
 		ir_init(NULL);
 		new_ir_prog("kaleidoscope");
 		d_mode = get_modeD();
