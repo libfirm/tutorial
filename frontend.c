@@ -20,7 +20,7 @@ static ir_type *d_type;
 // keeps track of the current store
 static ir_node *cur_store;
 
-//NEW
+// our AST
 static expr_t *main_exprs;
 static expr_t *last_main_expr;
 static prototype_t *prototypes;
