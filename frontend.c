@@ -328,8 +328,10 @@ static expr_t *parse_id_expr(void)
 		next_token();
 
 		call = new_call_expr(identifier, args, c);
-		if (check_call(call))
+		if (check_call(call)) {
 			id_expr = new_expr(call, EXPR_CALL);
+			printf("DEBUG: Parsed a call\n");
+		}
 	}
 
 	return id_expr;
@@ -410,7 +412,7 @@ static prototype_t *parse_prototype(void)
 {
 	prototype_t *proto = NULL;
 	parameter_t *args = NULL;
-	int argc;
+	int argc = 0;
 	char *fn_name = NULL;
 
 	if (cur_token != TOK_ID) {
@@ -435,14 +437,13 @@ static prototype_t *parse_prototype(void)
 		}
 	}
 
+	printf("DEBUG: parsed prototype of %s\n", fn_name);
 	next_token();
 
 	proto = new_prototype(fn_name, args, argc);
 
 	proto->next = prototypes;
 	prototypes = proto;
-
-	printf("DEBUG: parsed prototype of %s\n", proto->name);
 
 	return proto;
 }
@@ -495,14 +496,15 @@ static expr_t *parse_expr(void)
 }
 
 // the main parser loop
-static int parser_loop(void)
+static bool parser_loop(void)
 {
 	bool err = false;
+	next_token();
 	while (!err) {
-		next_token();
+		//next_token();
 		switch (cur_token) {
 		case TOK_EOF:
-			return 0;
+			return true;
 		case TOK_DEF:
 			err = !parse_definition();
 			break;
@@ -520,7 +522,7 @@ static int parser_loop(void)
 		if (err) error("Unexpected Parser Error!", "");
 	}
 
-	return -1;
+	return false;
 }
 
 // ********************* to firm ***********************
@@ -707,18 +709,19 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	parser_loop();
+	if (parser_loop()) {
+		ir_init(NULL);
+		new_ir_prog("kaleidoscope");
+		d_mode = get_modeD();
+		d_type = new_type_primitive(d_mode);
 
-	ir_init(NULL);
-	new_ir_prog("kaleidoscope");
-	d_mode = get_modeD();
-	d_type = new_type_primitive(d_mode);
+		create_func_entities();
+		create_func_graphs();
+		create_main();
 
-	create_func_entities();
-	create_func_graphs();
-	create_main();
+		ir_finish();
+	}
 
-	ir_finish();
 	return 0;
 }
 

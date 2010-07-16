@@ -1,6 +1,6 @@
 def plustwo(x)
 	x + 2
- 
+
 def times(x y)
 	x * y
 
