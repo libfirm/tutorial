@@ -1,0 +1,34 @@
+**** The AST ******
+
+The AST comprises expressions, prototypes and functions. It is accessed via the following global variables:
+Zeilen 24-30
+
+
+Expressions are represented uniformly by the expr_t struct. The enum expr_kind is used to differentiate between various types of expressions. Often expressions are kept as lists therefor they contain a pointer to the next expression.
+Zeilen 126 - 140
+
+So far we have four kinds of expressions.
+Number expressions:
+Zeilen 143-145
+
+Variable expressions:
+Zeilen -
+
+Binary expressions:
+Zeilen -
+
+Call expressions:
+Zeilen -
+
+For each kind of expression there is a constructor, the code is self explanatory:
+Zeilen
+
+To wrap an expression in the generic expr_t there is the expr_t constructor which takes an expression and its kind as arguments:
+Zeilen -
+
+Prototypes are represented by the prototype_t struct. All prototypes of a kaleidoscope program are stored in one singly linked list that is accessable via the global variable prototypes shown before.
+The types parameter_t and ir_entity will be explained shortly.
+Zeilen -
+
+Functions are represented by the function_t struct and consist of a head and a body. Just like the prototypes they are stored in a singly linked list, which is accessable via the global variable functions.
+Zeilen -

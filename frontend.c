@@ -20,11 +20,11 @@ static ir_type *d_type;
 // keeps track of the current store
 static ir_node *cur_store;
 
-// our AST
-static expr_t *main_exprs;
-static expr_t *last_main_expr;
-static prototype_t *prototypes;
-static function_t *functions;
+// the AST
+static expr_t *main_exprs;			// a list containing the top level expressions
+static expr_t *last_main_expr;		// the tail of that list
+static prototype_t *prototypes;		// a list containing the prototypes
+static function_t *functions;		// a list containing the functions
 
 // the identifier string
 static char *id_str;
@@ -133,30 +133,30 @@ typedef enum expr_kind {
 
 // container struct fur all kinds of expressions
 struct expr_t {
-	void *expr;
+	void *expr;			// the actuall expression
 	expr_kind which;
 
-	expr_t *next;
+	expr_t *next;		// pointer to the next expression
 };
 
 // structs representing the different kinds of expressions
 typedef struct num_expr_t {
-	double val;
+	double val;		// the double value of a number
 } num_expr_t;
 
 typedef struct var_expr_t {
-	char *name;
+	char *name;		// the name of a variable
 } var_expr_t;
 
 typedef struct bin_expr_t {
-	char op;
-	expr_t *lhs, *rhs;
+	char op;			// the binary operator
+	expr_t *lhs, *rhs;	// the left and right hand side
 } bin_expr_t;
 
 typedef struct call_expr_t {
-	char *callee;
-	expr_t *args;
-	int argc;
+	char *callee;		// the function to be called
+	expr_t *args;		// the arguments of the call
+	int argc;			// the number of arguments
 } call_expr_t;
 
 typedef struct parameter_t parameter_t;
@@ -185,18 +185,18 @@ static ir_node *get_arg(parameter_t *params, char *name)
 
 struct prototype_t {
 	char *name;
-	parameter_t *args;
-	int argc;
-	ir_entity *ent;
+	parameter_t *args;		// the argument names
+	int argc;				// the number of arguments
+	ir_entity *ent;			// the entity of the function represented by this prototype
 
-	prototype_t *next;
+	prototype_t *next;		// pointer to the next prototype
 };
 
 struct function_t {
-	prototype_t *head;
-	expr_t *body;
+	prototype_t *head;		// the head of the function
+	expr_t *body;			// the function body, i.e. a expression
 
-	function_t *next;
+	function_t *next;		// pointer to the next function
 };
 
 // constructors for the various expression structures
@@ -708,7 +708,7 @@ static char *gen_prog_name(char *source_name)
 static char *gen_asm_name(char *prog_name)
 {
 	int len = strlen(prog_name);
-	char *asm_name = calloc(len + 3, sizeof(char));
+	char *asm_name = calloc(len + 3, sizeof(char)); // .s + '\0'
 
 	strcpy(asm_name, prog_name);
 	strncat(asm_name, ".s", 2);
