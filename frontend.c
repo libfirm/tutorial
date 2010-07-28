@@ -59,7 +59,6 @@ static int get_token(void)
 	static int ch = ' ';
 	char buffer[256];
 
-	//printf("DEBUG: Lexer: ");
 	// Skip whitespace
 	while (isspace(ch))
 		ch = fgetc(file);
@@ -68,7 +67,6 @@ static int get_token(void)
 	if (isalpha(ch)) {
 		int i = 0;
 		do {
-			//printf("%c", ch); //DEBUG
 			buffer[i++] = ch;
 			ch = fgetc(file);
 		} while (isalnum(ch));
@@ -76,24 +74,20 @@ static int get_token(void)
 
 		if (strcmp(buffer, "def") == 0) {
 			ret = TOK_DEF;
-			//printf("\t\t\tdef"); // DEBUG
 		}
 		else if (strcmp(buffer, "extern") == 0) {
 			ret = TOK_EXT;
-			//printf("\t\t\textern"); // DEBUG
 		}
 		else {
 			id_str = calloc(strlen(buffer) + 1, sizeof(char));
 			strcpy(id_str, buffer);
 			ret = TOK_ID;
-			//printf("\t\t\tid"); // DEBUG
 		}
 	// number
 	} else if (isdigit(ch)) {
 		int i = 0;
 
 		do {
-			//printf("%c", ch); // DEBUG
 			buffer[i++] = ch;
 			ch = fgetc(file);
 		} while (isdigit(ch) || ch == '.');
@@ -101,7 +95,6 @@ static int get_token(void)
 
 		num_val = atof(buffer);
 		ret = TOK_NUM;
-		//printf("\t\t\tnumber"); // DEBUG
 	// ignore comments
 	} else if (ch == '#') {
 		do ch = fgetc(file);
@@ -114,11 +107,9 @@ static int get_token(void)
 	} else if (ch == EOF)
 		ret = TOK_EOF;
 	else {
-		//printf("%c\t\t\twhatever", ch); // DEBUG
 		ret = ch;
 		ch = fgetc(file);
 	}
-	//printf("\n");	// DEBUG
 
 	return ret;
 }
@@ -330,7 +321,6 @@ static expr_t *parse_id_expr(void)
 		call = new_call_expr(identifier, args, c);
 		if (check_call(call)) {
 			id_expr = new_expr(call, EXPR_CALL);
-			//printf("DEBUG: Parsed a call\n");
 		}
 	}
 
@@ -437,7 +427,6 @@ static prototype_t *parse_prototype(void)
 		}
 	}
 
-	//printf("DEBUG: parsed prototype of %s\n", fn_name);
 	next_token();
 
 	proto = new_prototype(fn_name, args, argc);
@@ -463,7 +452,6 @@ static bool parse_definition(void)
 		 function_t *fn = new_function(prototype, body);
 		 fn->next = functions;
 		 functions = fn;
-		 //printf("DEBUG: parsed function %s\n", prototype->name);
 		 return true;
 	} else {
 		return false;
@@ -564,7 +552,6 @@ static ir_node *handle_var_expr(var_expr_t *var, parameter_t *args)
 // generates the nodes for the given call expression
 static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 {
-	//printf("DEBUG: call to %s\n", call->callee);
 
 	ir_node *callee = NULL;
 	ir_node **in = NULL;
@@ -622,18 +609,16 @@ static ir_node *handle_expr(expr_t *expr, parameter_t *args)
 	}
 }
 
-// creates the entities to all functions
-static void create_func_entities(void)
+// creates the entities to all prototypes
+static void create_prototype_entities(void)
 {
-	for (function_t *fn = functions; fn != NULL; fn = fn->next) {
-		//printf("DEBUG: creating entity for function %s\n", fn->head->name);
+	for (prototype_t *proto = prototypes; proto != NULL; proto = proto->next) {
+		ir_type *proto_type = new_type_method(proto->argc, 1);
+		for (int i = 0; i < proto->argc; i++)
+			set_method_param_type(proto_type, i, d_type);
+		set_method_res_type(proto_type, 0, d_type);
 
-		ir_type *fn_type = new_type_method(fn->head->argc, 1);
-		for (int i = 0; i < fn->head->argc; i++)
-			set_method_param_type(fn_type, i, d_type);
-		set_method_res_type(fn_type, 0, d_type);
-
-		fn->head->ent = new_entity(get_glob_type(), new_id_from_str(fn->head->name), fn_type);
+		proto->ent = new_entity(get_glob_type(), new_id_from_str(proto->name), proto_type);
 	}
 }
 
@@ -641,8 +626,6 @@ static void create_func_entities(void)
 static void create_func_graphs(void)
 {
 	for (function_t *fn = functions; fn != NULL; fn = fn->next) {
-		//printf("DEBUG: in function %s\n", fn->head->name);
-		
 		int n_param = fn->head->argc;
 		ir_graph *fun_graph = new_ir_graph(fn->head->ent, n_param);
 
@@ -673,6 +656,7 @@ static void create_func_graphs(void)
 		add_immBlock_pred(end, ret);
 		mature_immBlock(end);
 
+		irg_finalize_cons(fun_graph);
 		// dump the graph
 		dump_ir_block_graph(fun_graph, "");
 	}
@@ -695,38 +679,78 @@ static void create_main(void)
 	ir_node **result = &node;
 	ir_node *ret = new_Return(cur_store, 1, result);
 	add_immBlock_pred(get_irg_end_block(fn_main), ret);
+	mature_immBlock(get_irg_current_block(fn_main));
 	mature_immBlock(get_irg_end_block(fn_main));
 	// set it as the main function
 	set_irp_main_irg(fn_main);
+	irg_finalize_cons(fn_main);
 	// and dump it
 	dump_ir_block_graph(fn_main, "");
 }
 
-
 // ******************* Main *************************
+
+static char *gen_prog_name(char *source_name)
+{
+	int len = strlen(source_name);
+	char *prog_name = calloc(len + 1, sizeof(char));
+
+	int i = 0;
+	while (source_name[i] != '.' && source_name[i] != '\0') {
+		prog_name[i] = source_name[i];
+		i++;
+	}
+	prog_name[i] = '\0';
+
+	return prog_name;
+}
+
+static char *gen_asm_name(char *prog_name)
+{
+	int len = strlen(prog_name);
+	char *asm_name = calloc(len + 3, sizeof(char));
+
+	strcpy(asm_name, prog_name);
+	strncat(asm_name, ".s", 2);
+
+	return asm_name;
+}
 
 int main(int argc, char **argv)
 {
+	char *prog_name;
+
 	// open the source file
 	if (argc == 2) {
+		prog_name = gen_prog_name(argv[1]);
 		file = fopen(argv[1], "r");
-	} else {
-		error("Wrong number of arguments", "");
-		return -1;
+	} 
+	
+	if (file == NULL) {
+		error("Could not open source file", "");
+		exit(1);
 	}
 
 	// run the parser loop
 	if (parser_loop()) {
 		// create the libfirm stuff
 		ir_init(NULL);
-		new_ir_prog("kaleidoscope");
+		new_ir_prog(prog_name);
 		d_mode = get_modeD();
 		d_type = new_type_primitive(d_mode);
 
-		create_func_entities();
+		create_prototype_entities();
 		create_func_graphs();
 		create_main();
 
+		char *asm_name = gen_asm_name(prog_name);
+		FILE *out = NULL;
+		if ((out = fopen(asm_name, "w")) == NULL) {
+			error("Could not open output file ", asm_name);
+			exit(1);
+		}
+
+		be_main(out, prog_name);
 		ir_finish();
 	}
 
