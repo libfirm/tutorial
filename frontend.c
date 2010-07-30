@@ -133,7 +133,7 @@ typedef enum expr_kind {
 
 // container struct fur all kinds of expressions
 struct expr_t {
-	void *expr;			// the actuall expression
+	void *expr;			// the actual expression
 	expr_kind which;
 
 	expr_t *next;		// pointer to the next expression
@@ -206,6 +206,13 @@ static expr_t *new_expr(void *expr, expr_kind which)
 	e->expr = expr;
 	e->which = which;
 	return e;
+}
+
+static num_expr_t *new_num_expr(double val)
+{
+	num_expr_t *n = calloc(1, sizeof(num_expr_t));
+	n->val = val;
+	return n;
 }
 
 static var_expr_t *new_var_expr(char *name)
@@ -330,8 +337,7 @@ static expr_t *parse_id_expr(void)
 // parse a number expression
 static expr_t *parse_num_expr(void)
 {
-	num_expr_t *expr = calloc(1, sizeof(num_expr_t));
-	expr->val = num_val;
+	num_expr_t *expr = new_num_expr(num_val);
 	next_token();
 
 	return new_expr(expr, EXPR_NUM);
@@ -595,8 +601,8 @@ static ir_node *handle_expr(expr_t *expr, parameter_t *args)
 	switch (expr->which) {
 	case EXPR_NUM:
 	{
-		num_expr_t *num = (num_expr_t *) expr->expr;
-		return new_Const(new_tarval_from_double(num->val, d_mode));
+		num_expr_t *num = (num_expr_t *) expr->expr;					// cast to num_expr_t
+		return new_Const(new_tarval_from_double(num->val, d_mode));		// create a constant
 	}
 	case EXPR_BIN:
 		return handle_bin_expr((bin_expr_t *) expr->expr, args);
@@ -609,56 +615,56 @@ static ir_node *handle_expr(expr_t *expr, parameter_t *args)
 	}
 }
 
-// creates the entities to all prototypes
+// creates an entity for each prototype
 static void create_prototype_entities(void)
 {
 	for (prototype_t *proto = prototypes; proto != NULL; proto = proto->next) {
-		ir_type *proto_type = new_type_method(proto->argc, 1);
-		for (int i = 0; i < proto->argc; i++)
-			set_method_param_type(proto_type, i, d_type);
-		set_method_res_type(proto_type, 0, d_type);
-
+		ir_type *proto_type = new_type_method(proto->argc, 1);		// create a method type
+		for (int i = 0; i < proto->argc; i++)						// for each parameter
+			set_method_param_type(proto_type, i, d_type);			// set its type to double
+		set_method_res_type(proto_type, 0, d_type);					// just like the result type
+		// that's all we need to create the entity
 		proto->ent = new_entity(get_glob_type(), new_id_from_str(proto->name), proto_type);
 	}
 }
 
-// creates an ir_graph for the given function
+// creates an ir_graph for each function
 static void create_func_graphs(void)
 {
 	for (function_t *fn = functions; fn != NULL; fn = fn->next) {
 		int n_param = fn->head->argc;
-		ir_graph *fun_graph = new_ir_graph(fn->head->ent, n_param);
-
-		// set cur_store
-		cur_store = get_irg_initial_mem(fun_graph);
+		ir_graph *fun_graph = new_ir_graph(fn->head->ent, n_param);	// create a new graph
+		cur_store = get_irg_initial_mem(fun_graph);					// update the cur_store pointer
 		// create the projs for the parameters
 		if (n_param > 0) {
+			// keep track of the current block
 			ir_node *block = get_irg_current_block(fun_graph);
+			// set the start block to be the current block
 			set_irg_current_block(fun_graph, get_irg_start_block(fun_graph));
-
+			// get a reference to the arguments node
 			ir_node *args = get_irg_args(fun_graph);
-			// initialize the parameter list
-			int i = 0;
+			
+			int i = 0;												// for each argument
 			for (parameter_t *p = fn->head->args; p != NULL; p = p->next) {
-				p->proj = new_Proj(args, d_mode, i++);
+				p->proj = new_Proj(args, d_mode, i++);				// create a projection node
 			}
 
-			set_irg_current_block(fun_graph, block);
+			set_irg_current_block(fun_graph, block);				// restore the current block
 		}
+		// the body is just an expression
+		ir_node *node = handle_expr(fn->body, fn->head->args);		
+		// the result of the function is the result of the body
+		ir_node **result = &node;
+		ir_node *ret = new_Return(cur_store, 1, result);			// create a return node
+		mature_immBlock(get_irg_current_block(fun_graph));			// mature the block
 
-		// handle the function body
-		ir_node *node = handle_expr(fn->body, fn->head->args);
-		ir_node **result = &node; 
-		ir_node *ret = new_Return(cur_store, 1, result);
-		mature_immBlock(get_irg_current_block(fun_graph));
+		ir_node *end = get_irg_end_block(fun_graph);				// get hold of the end block
+		// set the return node to be its predecessor
+		add_immBlock_pred(end, ret);								
+		mature_immBlock(end);										// mature the end block
 
-		ir_node *end = get_irg_end_block(fun_graph);
-		add_immBlock_pred(end, ret);
-		mature_immBlock(end);
-
-		irg_finalize_cons(fun_graph);
-		// dump the graph
-		dump_ir_block_graph(fun_graph, "");
+		irg_finalize_cons(fun_graph);								// finalize the construction
+		dump_ir_block_graph(fun_graph, "");							// dump the graph
 	}
 }
 
@@ -736,8 +742,8 @@ int main(int argc, char **argv)
 		// create the libfirm stuff
 		ir_init(NULL);
 		new_ir_prog(prog_name);
-		d_mode = get_modeD();
-		d_type = new_type_primitive(d_mode);
+		d_mode = get_modeD();					// set d_mode to the double mode
+		d_type = new_type_primitive(d_mode);	// create the primitive double type
 
 		create_prototype_entities();
 		create_func_graphs();
