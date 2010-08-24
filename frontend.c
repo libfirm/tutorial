@@ -535,8 +535,8 @@ static ir_node *handle_bin_expr(bin_expr_t *bin_ex, parameter_t *args)
 	switch (bin_ex->op) {
 	case '<':
 	{
-		ir_node *cmp = new_Cmp(lhs, rhs);
-		return new_Proj(cmp, d_mode, pn_Cmp_Lt);
+		ir_node *cmp = new_Cmp(lhs, rhs);			// compare lhs with rhs
+		return new_Proj(cmp, d_mode, pn_Cmp_Lt);	// is lhs less than rhs?
 	}
 	case '+':
 		return new_Add(lhs, rhs, d_mode);
@@ -567,9 +567,11 @@ static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 	ir_node *result = NULL;
 	ir_entity *ent = NULL;
 
+	// allocate space for an array referencing the arguments
 	if (call->argc > 0)
 		in = calloc(call->argc, sizeof(ir_node **));
 
+	// find the corresponding prototype and create a symbolic constant
 	for (prototype_t *p = prototypes; p != NULL; p = p->next) {
 		if (!strcmp(p->name, call->callee)) {
 			ent = p->ent;
@@ -579,13 +581,16 @@ static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 	}
 
 	if (callee != NULL) {
+		// handle the arguments
 		int i = 0;
 		for (expr_t *e = call->args; e != NULL; e = e->next) {
 			in[i++] = handle_expr(e, args);
 		}
-
+		// create the call
 		ir_node *call_node = new_Call(cur_store, callee, call->argc, in, get_entity_type(ent));
+		// update the current store
 		cur_store = new_Proj(call_node, get_modeM(), pn_Generic_M);
+		// get the result
 		ir_node *tuple = new_Proj(call_node, get_modeT(), pn_Call_T_result);
 		result = new_Proj(tuple, d_mode, 0);
 	} else {
@@ -674,20 +679,24 @@ static void create_func_graphs(void)
 // create the main graph
 static void create_main(void)
 {
-	ir_type *type = new_type_method(0, 1);
-	set_method_res_type(type, 0, d_type);
+	ir_type *type = new_type_method(0, 1);							// create the type
+	set_method_res_type(type, 0, d_type);							// set the result type
+	// create an entity
 	ir_entity *ent = new_entity(get_glob_type(), new_id_from_str("main"), type);
+	// create a fresh graph
 	ir_graph *fn_main = new_ir_graph(ent, 0);
 	cur_store = get_irg_initial_mem(fn_main);
 
+	// handle each expression and keep a reference to the last one
 	ir_node *node = NULL;
 	for (expr_t *e = main_exprs; e != NULL; e = e->next) {
 		node = handle_expr(e, NULL);
 	}
-
+	// get the result
 	ir_node **result = &node;
 	ir_node *ret = new_Return(cur_store, 1, result);
 	add_immBlock_pred(get_irg_end_block(fn_main), ret);
+	// mature the current and the end block
 	mature_immBlock(get_irg_current_block(fn_main));
 	mature_immBlock(get_irg_end_block(fn_main));
 	// set it as the main function
