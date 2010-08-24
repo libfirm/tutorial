@@ -175,14 +175,6 @@ static parameter_t *new_parameter(char *name)
 	return p;
 }
 
-static ir_node *get_arg(parameter_t *params, char *name)
-{
-	for (parameter_t *p = params; p != NULL; p = p->next) {
-		if (!strcmp(p->name, name)) return p->proj;
-	}
-	return NULL;
-}
-
 struct prototype_t {
 	char *name;
 	parameter_t *args;		// the argument names
@@ -435,11 +427,20 @@ static prototype_t *parse_prototype(void)
 
 	next_token();
 
-	proto = new_prototype(fn_name, args, argc);
+	// if a prototype with the same name already exists, don't create another one
+	for (prototype_t *p = prototypes; p != NULL; p = p->next) {
+		if (!strcmp(p->name, fn_name)) {
+			proto = p;
+			p = NULL;
+		}
+	}
 
-	proto->next = prototypes;
-	prototypes = proto;
-
+	if (proto == NULL) {
+		// the prototype doesn't already exist
+		proto = new_prototype(fn_name, args, argc);=
+		proto->next = prototypes;
+		prototypes = proto;
+	}
 	return proto;
 }
 
@@ -524,7 +525,7 @@ static bool parser_loop(void)
 
 static ir_node *handle_expr(expr_t *expr, parameter_t *args);
 
-// generates the node for a binary expression
+// generates the nodes for a binary expression
 static ir_node *handle_bin_expr(bin_expr_t *bin_ex, parameter_t *args)
 {
 	// lhs and rhs are both expressions
@@ -552,13 +553,15 @@ static ir_node *handle_bin_expr(bin_expr_t *bin_ex, parameter_t *args)
 // returns the proj for the given parameter
 static ir_node *handle_var_expr(var_expr_t *var, parameter_t *args)
 {
-	return get_arg(args, var->name);
+	for (parameter_t *p = args; p != NULL; p = p->next) {
+		if (!strcmp(p->name, var->name)) return p->proj;
+	}
+	return NULL;
 }
 
 // generates the nodes for the given call expression
 static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 {
-
 	ir_node *callee = NULL;
 	ir_node **in = NULL;
 	ir_node *result = NULL;
@@ -628,6 +631,11 @@ static void create_prototype_entities(void)
 	}
 }
 
+// creates a symbolic constant for each prototype
+static void create_prototype_symconsts(void)
+{
+}
+
 // creates an ir_graph for each function
 static void create_func_graphs(void)
 {
@@ -656,11 +664,11 @@ static void create_func_graphs(void)
 		// the result of the function is the result of the body
 		ir_node **result = &node;
 		ir_node *ret = new_Return(cur_store, 1, result);			// create a return node
-		mature_immBlock(get_irg_current_block(fun_graph));			// mature the block
-
 		ir_node *end = get_irg_end_block(fun_graph);				// get hold of the end block
 		// set the return node to be its predecessor
 		add_immBlock_pred(end, ret);								
+
+		mature_immBlock(get_irg_current_block(fun_graph));			// mature the current block
 		mature_immBlock(end);										// mature the end block
 
 		irg_finalize_cons(fun_graph);								// finalize the construction
