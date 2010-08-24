@@ -437,7 +437,7 @@ static prototype_t *parse_prototype(void)
 
 	if (proto == NULL) {
 		// the prototype doesn't already exist
-		proto = new_prototype(fn_name, args, argc);=
+		proto = new_prototype(fn_name, args, argc);
 		proto->next = prototypes;
 		prototypes = proto;
 	}
@@ -629,11 +629,6 @@ static void create_prototype_entities(void)
 		// that's all we need to create the entity
 		proto->ent = new_entity(get_glob_type(), new_id_from_str(proto->name), proto_type);
 	}
-}
-
-// creates a symbolic constant for each prototype
-static void create_prototype_symconsts(void)
-{
 }
 
 // creates an ir_graph for each function
