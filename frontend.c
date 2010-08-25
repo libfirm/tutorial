@@ -125,16 +125,16 @@ static int next_token(void)
 
 // needed to identify the expressions in expr_t
 typedef enum expr_kind {
-	EXPR_NUM,
-	EXPR_VAR,
-	EXPR_BIN,
-	EXPR_CALL,
+	EXPR_NUM,			// number expression
+	EXPR_VAR,			// variable expression
+	EXPR_BIN,			// binary expression
+	EXPR_CALL,			// call expression
 } expr_kind;
 
-// container struct fur all kinds of expressions
+// container struct for all kinds of expressions
 struct expr_t {
 	void *expr;			// the actual expression
-	expr_kind which;
+	expr_kind which;	// it's kind
 
 	expr_t *next;		// pointer to the next expression
 };
