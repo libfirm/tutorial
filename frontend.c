@@ -6,6 +6,7 @@
 
 #include <libfirm/firm.h>
 
+// we need these ahead declarations
 typedef struct expr_t expr_t;
 typedef struct prototype_t prototype_t;
 typedef struct function_t function_t;
@@ -13,12 +14,10 @@ typedef struct function_t function_t;
 // the source file
 static FILE *file;
 
-// we only need to get those once
-static ir_mode *d_mode;
-static ir_type *d_type;
-
-// keeps track of the current store
-static ir_node *cur_store;
+// global variables needed by the parser
+static char *id_str;				// the identifier string
+static double num_val;				// contains the value of any numbers
+static int cur_token;				// our current token
 
 // the AST
 static expr_t *main_exprs;			// a list containing the top level expressions
@@ -26,16 +25,14 @@ static expr_t *last_main_expr;		// the tail of that list
 static prototype_t *prototypes;		// a list containing the prototypes
 static function_t *functions;		// a list containing the functions
 
-// the identifier string
-static char *id_str;
-// contains the value of any numbers
-static double num_val;
-// our current token
-static int cur_token;
+// global variables needed for the creation of the firm graphs
+static ir_mode *d_mode;				// the double mode
+static ir_type *d_type;				// the double type
+static ir_node *cur_store;			// keeps track of the current store
 
 // ************************** Error *****************************
 
-// obvious ;D
+// error printing
 static void error(char *msg, char *info)
 {
 	fprintf(stderr, "Error: %s%s.\n", msg, info);
@@ -45,21 +42,21 @@ static void error(char *msg, char *info)
 
 // Token enum for the lexer
 enum token_t {
-	TOK_EOF = -1,	// End of file
-	TOK_DEF = -2,	// Function definition
-	TOK_EXT = -3,	// Extern function
-	TOK_ID = -4,	// Identifier
-	TOK_NUM = -5,	// Number
+	TOK_EOF = -1,	// end of file
+	TOK_DEF = -2,	// function definition
+	TOK_EXT = -3,	// extern function
+	TOK_ID = -4,	// identifier
+	TOK_NUM = -5,	// number
 };
 
-// Returns the current token
+// returns the current token
 static int get_token(void)
 {
 	int ret = 0;
 	static int ch = ' ';
 	char buffer[256];
 
-	// Skip whitespace
+	// skip whitespace
 	while (isspace(ch))
 		ch = fgetc(file);
 		
@@ -125,38 +122,38 @@ static int next_token(void)
 
 // needed to identify the expressions in expr_t
 typedef enum expr_kind {
-	EXPR_NUM,			// number expression
-	EXPR_VAR,			// variable expression
-	EXPR_BIN,			// binary expression
-	EXPR_CALL,			// call expression
+	EXPR_NUM,				// number expression
+	EXPR_VAR,				// variable expression
+	EXPR_BIN,				// binary expression
+	EXPR_CALL,				// call expression
 } expr_kind;
 
 // container struct for all kinds of expressions
 struct expr_t {
-	void *expr;			// the actual expression
-	expr_kind which;	// it's kind
+	void *expr;				// the actual expression
+	expr_kind which;		// it's kind
 
-	expr_t *next;		// pointer to the next expression
+	expr_t *next;			// pointer to the next expression
 };
 
 // structs representing the different kinds of expressions
 typedef struct num_expr_t {
-	double val;		// the double value of a number
+	double val;				// the double value of a number
 } num_expr_t;
 
 typedef struct var_expr_t {
-	char *name;		// the name of a variable
+	char *name;				// the name of a variable
 } var_expr_t;
 
 typedef struct bin_expr_t {
-	char op;			// the binary operator
-	expr_t *lhs, *rhs;	// the left and right hand side
+	char op;				// the binary operator
+	expr_t *lhs, *rhs;		// the left and right hand side
 } bin_expr_t;
 
 typedef struct call_expr_t {
-	char *callee;		// the function to be called
-	expr_t *args;		// the arguments of the call
-	int argc;			// the number of arguments
+	char *callee;			// the function to be called
+	expr_t *args;			// the arguments of the call
+	int argc;				// the number of arguments
 } call_expr_t;
 
 typedef struct parameter_t parameter_t;
@@ -251,6 +248,7 @@ static function_t *new_function(prototype_t *head, expr_t *body)
 
 // ********************* Parser *************************
 
+// ahead declaration
 static expr_t *parse_expr(void);
 
 // returns the precedence of the current token
@@ -523,6 +521,7 @@ static bool parser_loop(void)
 
 // ********************* to firm ***********************
 
+// ahead declaration
 static ir_node *handle_expr(expr_t *expr, parameter_t *args);
 
 // generates the nodes for a binary expression
@@ -609,8 +608,8 @@ static ir_node *handle_expr(expr_t *expr, parameter_t *args)
 	switch (expr->which) {
 	case EXPR_NUM:
 	{
-		num_expr_t *num = (num_expr_t *) expr->expr;					// cast to num_expr_t
-		return new_Const(new_tarval_from_double(num->val, d_mode));		// create a constant
+		num_expr_t *num = (num_expr_t *) expr->expr;				// cast to num_expr_t
+		return new_Const(new_tarval_from_double(num->val, d_mode));	// create a constant
 	}
 	case EXPR_BIN:
 		return handle_bin_expr((bin_expr_t *) expr->expr, args);
@@ -708,6 +707,7 @@ static void create_main(void)
 
 // ******************* Main *************************
 
+// extract the program name from the source file name
 static char *gen_prog_name(char *source_name)
 {
 	int len = strlen(source_name);
@@ -723,6 +723,7 @@ static char *gen_prog_name(char *source_name)
 	return prog_name;
 }
 
+// generate a name for the assembly file
 static char *gen_asm_name(char *prog_name)
 {
 	int len = strlen(prog_name);
@@ -743,20 +744,18 @@ int main(int argc, char **argv)
 		prog_name = gen_prog_name(argv[1]);
 		file = fopen(argv[1], "r");
 	} 
-	
+	// error checking
 	if (file == NULL) {
 		error("Could not open source file", "");
 		exit(1);
 	}
 
-	// run the parser loop
-	if (parser_loop()) {
-		// create the libfirm stuff
-		ir_init(NULL);
-		new_ir_prog(prog_name);
+	if (parser_loop()) {						// run the parser loop
+		ir_init(NULL);							// initialize libfirm
+		new_ir_prog(prog_name);					// create a new program
 		d_mode = get_modeD();					// set d_mode to the double mode
 		d_type = new_type_primitive(d_mode);	// create the primitive double type
-
+		// create the graphs
 		create_prototype_entities();
 		create_func_graphs();
 		create_main();
@@ -768,8 +767,8 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 
-		be_main(out, prog_name);
-		ir_finish();
+		be_main(out, prog_name);				// emit code
+		ir_finish();							// clean up
 	}
 
 	return 0;
