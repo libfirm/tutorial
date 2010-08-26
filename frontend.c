@@ -736,7 +736,7 @@ int main(int argc, char **argv)
 {
 	char *prog_name;
 	char *src_file = NULL;
-	bool opt_dump = false;
+	bool opt_dump = false;						// '-d' as the first argument enables dumping
 
 	// handle the arguments
 	if (argc == 2) {
