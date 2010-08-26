@@ -40,13 +40,13 @@ static void error(char *msg, char *info)
 
 // ************ Lexer ************************************
 
-// Token enum for the lexer
+// the lexer's tokens
 enum token_t {
-	TOK_EOF = -1,	// end of file
-	TOK_DEF = -2,	// function definition
-	TOK_EXT = -3,	// extern function
-	TOK_ID = -4,	// identifier
-	TOK_NUM = -5,	// number
+	TOK_EOF	= -1,		// end of file
+	TOK_DEF	= -2,		// function definition
+	TOK_EXT	= -3,		// extern function
+	TOK_ID	= -4,		// identifier
+	TOK_NUM	= -5,		// number
 };
 
 // returns the current token
@@ -80,8 +80,7 @@ static int get_token(void)
 			strcpy(id_str, buffer);
 			ret = TOK_ID;
 		}
-	// number
-	} else if (isdigit(ch)) {
+	} else if (isdigit(ch)) {						// number
 		int i = 0;
 
 		do {
@@ -92,8 +91,7 @@ static int get_token(void)
 
 		num_val = atof(buffer);
 		ret = TOK_NUM;
-	// ignore comments
-	} else if (ch == '#') {
+	} else if (ch == '#') {							// comments will be ignored
 		do ch = fgetc(file);
 		while (ch != EOF && ch != '\n' && ch != '\r');
 
@@ -119,6 +117,9 @@ static int next_token(void)
 }
 
 // ************************** AST ***************************************
+
+// ahead declaration
+typedef struct parameter_t parameter_t;
 
 // needed to identify the expressions in expr_t
 typedef enum expr_kind {
@@ -156,7 +157,6 @@ typedef struct call_expr_t {
 	int argc;				// the number of arguments
 } call_expr_t;
 
-typedef struct parameter_t parameter_t;
 
 struct parameter_t {
 	char *name;
@@ -263,6 +263,7 @@ static int get_tok_prec(void)
 	}
 }
 
+// check if a prototype exists for the called function
 static bool check_call(call_expr_t *call)
 {
 	for (prototype_t *p = prototypes; p != NULL; p = p->next) {
@@ -280,31 +281,31 @@ static expr_t *parse_id_expr(void)
 
 	next_token();
 
-	if (cur_token != '(') {	// it's not a call
-		id_expr = new_expr(new_var_expr(identifier), EXPR_VAR);
-	} else {	// it's a call
+	if (cur_token != '(') {											// it's not a call
+		id_expr = new_expr(new_var_expr(identifier), EXPR_VAR);		// hence it's a variable
+	} else {
 		call_expr_t *call;
 		expr_t *args = NULL;
 		int c = 0;
 
 		next_token();
-		if (cur_token != ')') {
+		if (cur_token != ')') {										// the call has arguments
 			while (1) {
-				expr_t *e = parse_expr();
+				expr_t *e = parse_expr();							// an argument is an expression
 
-				if (e == NULL) {
+				if (e == NULL) {									// error checking
 					args = NULL;
 					break;
 				}
 
-				e->next = args;
+				e->next = args;										// link the arguments
 				args = e;
-				c++;
+				c++;												// and count them
 
-				if (cur_token == ')')
+				if (cur_token == ')')								// we're done
 					break;
 
-				if (cur_token != ',') {
+				if (cur_token != ',') {								// error checking
 					error("Expected ')' or ',' in argument list", "");
 					break;
 				}
@@ -320,7 +321,6 @@ static expr_t *parse_id_expr(void)
 			id_expr = new_expr(call, EXPR_CALL);
 		}
 	}
-
 	return id_expr;
 }
 
@@ -336,10 +336,10 @@ static expr_t *parse_num_expr(void)
 // parse a parantheses expression
 static expr_t *parse_paren_expr(void)
 {
-	next_token();		// eat the (
-	expr_t *result = parse_expr();
+	next_token();													// eat the '('
+	expr_t *result = parse_expr();									// parse the expression
 
-	if (cur_token != ')') {
+	if (cur_token != ')') {											// error checking
 		error("')' expected", "");
 		result = NULL;
 	}
@@ -347,7 +347,7 @@ static expr_t *parse_paren_expr(void)
 	return result;
 }
 
-// parse a primary expression
+// 
 static expr_t *parse_primary(void)
 {
 	switch (cur_token) {
@@ -425,7 +425,7 @@ static prototype_t *parse_prototype(void)
 
 	next_token();
 
-	// if a prototype with the same name already exists, don't create another one
+	// if a prototype with this name already exists, don't create another one
 	for (prototype_t *p = prototypes; p != NULL; p = p->next) {
 		if (!strcmp(p->name, fn_name)) {
 			proto = p;
@@ -450,8 +450,8 @@ static bool parse_definition(void)
 	
 	next_token();
 
-	prototype = parse_prototype();
-	body = parse_expr();
+	prototype = parse_prototype();								// its head is a prototype
+	body = parse_expr();										// its body is an expression
 
 	if (prototype != NULL && body != NULL) {
 		 function_t *fn = new_function(prototype, body);
@@ -476,6 +476,7 @@ static bool parse_top_lvl(void)
 		main_exprs = expr;
 	}
 	last_main_expr = expr;
+
 	return true;
 }
 
@@ -514,7 +515,6 @@ static bool parser_loop(void)
 		}
 		if (err) error("Unexpected Parser Error!", "");
 	}
-
 	// an error occurred
 	return false;
 }
@@ -671,7 +671,6 @@ static void create_func_graphs(void)
 		mature_immBlock(end);										// mature the end block
 
 		irg_finalize_cons(fun_graph);								// finalize the construction
-		dump_ir_block_graph(fun_graph, "");							// dump the graph
 	}
 }
 
@@ -701,8 +700,6 @@ static void create_main(void)
 	// set it as the main function
 	set_irp_main_irg(fn_main);
 	irg_finalize_cons(fn_main);
-	// and dump it
-	dump_ir_block_graph(fn_main, "");
 }
 
 // ******************* Main *************************
@@ -738,12 +735,25 @@ static char *gen_asm_name(char *prog_name)
 int main(int argc, char **argv)
 {
 	char *prog_name;
+	char *src_file;
+	bool opt_dump = false;
+
+	// handle the arguments
+	if (argc == 2) {
+		src_file = argv[1];
+	} else if (argc == 3 && !strcmp(argv[1], "-d")) {
+		src_file = argv[2];
+		opt_dump = true;
+	}
 
 	// open the source file
-	if (argc == 2) {
-		prog_name = gen_prog_name(argv[1]);
-		file = fopen(argv[1], "r");
-	} 
+	if (src_file != NULL) {
+		prog_name = gen_prog_name(src_file);
+		file = fopen(src_file, "r");
+	} else {
+		error("No source file provided", "");
+	}
+
 	// error checking
 	if (file == NULL) {
 		error("Could not open source file", "");
@@ -759,6 +769,9 @@ int main(int argc, char **argv)
 		create_prototype_entities();
 		create_func_graphs();
 		create_main();
+
+		if (opt_dump) 
+			dump_all_ir_graphs(&dump_ir_block_graph, "");
 
 		char *asm_name = gen_asm_name(prog_name);
 		FILE *out = NULL;
