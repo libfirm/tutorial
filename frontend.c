@@ -735,7 +735,7 @@ static char *gen_asm_name(char *prog_name)
 int main(int argc, char **argv)
 {
 	char *prog_name;
-	char *src_file;
+	char *src_file = NULL;
 	bool opt_dump = false;
 
 	// handle the arguments
@@ -744,15 +744,14 @@ int main(int argc, char **argv)
 	} else if (argc == 3 && !strcmp(argv[1], "-d")) {
 		src_file = argv[2];
 		opt_dump = true;
+	} else {
+		error("No source file provided", "");
+		exit(1);
 	}
 
 	// open the source file
-	if (src_file != NULL) {
-		prog_name = gen_prog_name(src_file);
-		file = fopen(src_file, "r");
-	} else {
-		error("No source file provided", "");
-	}
+	prog_name = gen_prog_name(src_file);
+	file = fopen(src_file, "r");
 
 	// error checking
 	if (file == NULL) {
