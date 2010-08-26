@@ -769,7 +769,7 @@ int main(int argc, char **argv)
 		create_func_graphs();
 		create_main();
 
-		if (opt_dump) 
+		if (opt_dump) 							// dump all graphs
 			dump_all_ir_graphs(&dump_ir_block_graph, "");
 
 		char *asm_name = gen_asm_name(prog_name);
