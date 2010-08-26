@@ -711,6 +711,7 @@ static char *gen_prog_name(char *source_name)
 	char *prog_name = calloc(len + 1, sizeof(char));
 
 	int i = 0;
+	// copy the prefix of the file name
 	while (source_name[i] != '.' && source_name[i] != '\0') {
 		prog_name[i] = source_name[i];
 		i++;
@@ -724,7 +725,8 @@ static char *gen_prog_name(char *source_name)
 static char *gen_asm_name(char *prog_name)
 {
 	int len = strlen(prog_name);
-	char *asm_name = calloc(len + 3, sizeof(char)); // .s + '\0'
+	// allocate enough space for the name + ".s\0"
+	char *asm_name = calloc(len + 3, sizeof(char));
 
 	strcpy(asm_name, prog_name);
 	strncat(asm_name, ".s", 2);
