@@ -454,16 +454,16 @@ static prototype_t *parse_prototype(void)
 // parse the definition of a function
 static bool parse_definition(void)
 {
-	prototype_t *prototype = NULL;
+	prototype_t *head = NULL;
 	expr_t *body = NULL;
 	
 	next_token();
 
-	prototype = parse_prototype();								// its head is a prototype
+	head = parse_prototype();									// its head is a prototype
 	body = parse_expr();										// its body is an expression
 
-	if (prototype != NULL && body != NULL) {
-		 function_t *fn = new_function(prototype, body);
+	if (head != NULL && body != NULL) {
+		 function_t *fn = new_function(head, body);
 		 fn->next = functions;
 		 functions = fn;
 		 return true;
