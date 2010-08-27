@@ -52,9 +52,9 @@ enum token_t {
 // returns the current token
 static int get_token(void)
 {
-	int ret = 0;
-	static int ch = ' ';
-	char buffer[256];
+	int ret = 0;									// the return value
+	static int ch = ' ';							// the current character
+	char buffer[256];								// the input buffer
 
 	// skip whitespace
 	while (isspace(ch))
@@ -62,13 +62,14 @@ static int get_token(void)
 		
 	// keyword or identifier
 	if (isalpha(ch)) {
+		// read in all successive alphanumeric characters
 		int i = 0;
 		do {
 			buffer[i++] = ch;
 			ch = fgetc(file);
 		} while (isalnum(ch));
 		buffer[i] = '\0';
-
+		// check for the keywords
 		if (strcmp(buffer, "def") == 0) {
 			ret = TOK_DEF;
 		}
@@ -76,36 +77,41 @@ static int get_token(void)
 			ret = TOK_EXT;
 		}
 		else {
+			// it is an identifier
 			id_str = calloc(strlen(buffer) + 1, sizeof(char));
 			strcpy(id_str, buffer);
 			ret = TOK_ID;
 		}
-	} else if (isdigit(ch)) {						// number
+	} else if (isdigit(ch)) {						// the input is a number
+		// read in all successive digits or the decimal point
 		int i = 0;
-
 		do {
 			buffer[i++] = ch;
 			ch = fgetc(file);
 		} while (isdigit(ch) || ch == '.');
 		buffer[i] = '\0';
 
-		num_val = atof(buffer);
+		num_val = atof(buffer);						// convert it to a double number
 		ret = TOK_NUM;
-	} else if (ch == '#') {							// comments will be ignored
+	} else if (ch == '#') {
+		// after the comment character we can ignore the rest of the line
 		do ch = fgetc(file);
 		while (ch != EOF && ch != '\n' && ch != '\r');
-
+		// check for the end of the file
 		if (ch == EOF)
 			ret = TOK_EOF;
+		// return what comes after the comment
 		else
 			ret = get_token();
-	} else if (ch == EOF)
+	} else if (ch == EOF) {
+		// check for the end of the file
 		ret = TOK_EOF;
-	else {
+	} else {
+		// it's an operator, which we return directly
 		ret = ch;
-		ch = fgetc(file);
+		ch = fgetc(file);							// get the next character
 	}
-
+	// return the token
 	return ret;
 }
 
