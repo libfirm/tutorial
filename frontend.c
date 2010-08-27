@@ -6,13 +6,15 @@
 
 #include <libfirm/firm.h>
 
+#define BUFFER_SIZE 512
+
 // we need these ahead declarations
 typedef struct expr_t expr_t;
 typedef struct prototype_t prototype_t;
 typedef struct function_t function_t;
 
 // the source file
-static FILE *file;
+static FILE *input;
 
 // global variables needed by the parser
 static char *id_str;				// the identifier string
@@ -54,11 +56,11 @@ static int get_token(void)
 {
 	int ret = 0;									// the return value
 	static int ch = ' ';							// the current character
-	char buffer[256];								// the input buffer
+	char buffer[BUFFER_SIZE];						// the input buffer
 
 	// skip whitespace
 	while (isspace(ch))
-		ch = fgetc(file);
+		ch = fgetc(input);
 		
 	// keyword or identifier
 	if (isalpha(ch)) {
@@ -66,7 +68,7 @@ static int get_token(void)
 		int i = 0;
 		do {
 			buffer[i++] = ch;
-			ch = fgetc(file);
+			ch = fgetc(input);
 		} while (isalnum(ch));
 		buffer[i] = '\0';
 		// check for the keywords
@@ -87,7 +89,7 @@ static int get_token(void)
 		int i = 0;
 		do {
 			buffer[i++] = ch;
-			ch = fgetc(file);
+			ch = fgetc(input);
 		} while (isdigit(ch) || ch == '.');
 		buffer[i] = '\0';
 
@@ -95,7 +97,7 @@ static int get_token(void)
 		ret = TOK_NUM;
 	} else if (ch == '#') {
 		// after the comment character we can ignore the rest of the line
-		do ch = fgetc(file);
+		do ch = fgetc(input);
 		while (ch != EOF && ch != '\n' && ch != '\r');
 		// check for the end of the file
 		if (ch == EOF)
@@ -109,7 +111,7 @@ static int get_token(void)
 	} else {
 		// it's an operator, which we return directly
 		ret = ch;
-		ch = fgetc(file);							// get the next character
+		ch = fgetc(input);							// get the next character
 	}
 	// return the token
 	return ret;
@@ -163,10 +165,10 @@ typedef struct call_expr_t {
 	int argc;				// the number of arguments
 } call_expr_t;
 
-
+// this struct represents parameters to a function
 struct parameter_t {
-	char *name;
-	ir_node *proj;
+	char *name;				// the parameter name
+	ir_node *proj;			// 
 
 	parameter_t *next;
 };
@@ -270,6 +272,7 @@ static int get_tok_prec(void)
 }
 
 // check if a prototype exists for the called function
+// and if the number of parameters is correct
 static bool check_call(call_expr_t *call)
 {
 	for (prototype_t *p = prototypes; p != NULL; p = p->next) {
@@ -292,7 +295,7 @@ static expr_t *parse_id_expr(void)
 	} else {
 		call_expr_t *call;
 		expr_t *args = NULL;
-		int c = 0;
+		int c = 0;													// the number of arguments
 
 		next_token();
 		if (cur_token != ')') {										// the call has arguments
@@ -321,10 +324,10 @@ static expr_t *parse_id_expr(void)
 		}
 
 		next_token();
-
+		// create the call expression
 		call = new_call_expr(identifier, args, c);
-		if (check_call(call)) {
-			id_expr = new_expr(call, EXPR_CALL);
+		if (check_call(call)) {										// check if the call is valid
+			id_expr = new_expr(call, EXPR_CALL);					// wrap it up
 		}
 	}
 	return id_expr;
@@ -404,19 +407,19 @@ static prototype_t *parse_prototype(void)
 {
 	prototype_t *proto = NULL;
 	parameter_t *args = NULL;
-	int argc = 0;
-	char *fn_name = NULL;
+	int argc = 0;													// number of arguments
+	char *fn_name = NULL;											// function name
 
 	if (cur_token != TOK_ID) {
 		error("Expected function name in prototype", "");
 	} else {
 		fn_name = id_str;
-		next_token();
+		next_token();												// eat the name
 
 		if (cur_token != '(') {
 			error("Expected '(' in prototype", "");
 		} else {
-			while (next_token() == TOK_ID) {
+			while (next_token() == TOK_ID) {						// get the arguments
 				parameter_t *arg = new_parameter(id_str);
 				arg->next = args;
 				args = arg;
@@ -743,14 +746,14 @@ static char *gen_asm_name(char *prog_name)
 int main(int argc, char **argv)
 {
 	char *prog_name;
-	char *src_file = NULL;
+	char *src_name = NULL;
 	bool opt_dump = false;						// '-d' as the first argument enables dumping
 
 	// handle the arguments
 	if (argc == 2) {
-		src_file = argv[1];
+		src_name = argv[1];
 	} else if (argc == 3 && !strcmp(argv[1], "-d")) {
-		src_file = argv[2];
+		src_name = argv[2];
 		opt_dump = true;
 	} else {
 		error("No source file provided", "");
@@ -758,11 +761,11 @@ int main(int argc, char **argv)
 	}
 
 	// open the source file
-	prog_name = gen_prog_name(src_file);
-	file = fopen(src_file, "r");
+	prog_name = gen_prog_name(src_name);
+	input = fopen(src_name, "r");
 
 	// error checking
-	if (file == NULL) {
+	if (src_name == NULL) {
 		error("Could not open source file", "");
 		exit(1);
 	}
