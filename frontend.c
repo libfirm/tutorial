@@ -17,9 +17,9 @@ typedef struct function_t function_t;
 static FILE *input;
 
 // global variables needed by the parser
+static int cur_token;				// our current token
 static char *id_str;				// the identifier string
 static double num_val;				// contains the value of any numbers
-static int cur_token;				// our current token
 
 // the AST
 static expr_t *main_exprs;			// a list containing the top level expressions
@@ -356,7 +356,7 @@ static expr_t *parse_paren_expr(void)
 	return result;
 }
 
-// 
+// parse a primary expression
 static expr_t *parse_primary(void)
 {
 	switch (cur_token) {
@@ -376,28 +376,32 @@ static expr_t *parse_primary(void)
 }
 
 // parse the right hand side of a binary expression
-static expr_t *parse_bin_rhs(int expr_prec, expr_t *lhs)
+static expr_t *parse_bin_rhs(int min_prec, expr_t *lhs)
 {
 	while(1) {
+		// get the precedence of the current token
 		int tok_prec = get_tok_prec();
-
-		if (tok_prec < expr_prec)
+		// if it is lower than the minimum precedence, return the lhs
+		if (tok_prec < min_prec)
 			return lhs;
-
+		// our binary operator is the current token
 		int bin_op = cur_token;
 		next_token();
-
+		// parse the rhs as primary expression
 		expr_t *rhs = parse_primary();
 		if (!rhs)
 			return NULL;
-
+		// get the precedence of the current token
 		int next_prec = get_tok_prec();
+		// if it is higher than the precedence of our binop
+		// then our rhs is the lhs of a binary expression with higher precedence
 		if (tok_prec < next_prec) {
+			// parse the pending binary operation first, with our rhs as its lhs
 			rhs = parse_bin_rhs(tok_prec + 1, rhs);
 			if (!rhs)
 				return NULL;
 		}
-
+		// merge lhs and rhs
 		lhs = new_expr(new_bin_expr(bin_op, lhs, rhs), EXPR_BIN);
 	}
 }
@@ -461,24 +465,25 @@ static bool parse_definition(void)
 
 	head = parse_prototype();									// its head is a prototype
 	body = parse_expr();										// its body is an expression
-
+	// check the results
 	if (head != NULL && body != NULL) {
-		 function_t *fn = new_function(head, body);
-		 fn->next = functions;
+		 function_t *fn = new_function(head, body);				// create the function struct
+		 fn->next = functions;									// put it in the global function list
 		 functions = fn;
-		 return true;
+		 return true;											// success
 	} else {
-		return false;
+		return false;											// failure
 	}
 }
 
 // parse a top level expression
 static bool parse_top_lvl(void)
 {
-	expr_t *expr = parse_expr();
-	if (expr == NULL)
-		return false;
+	expr_t *expr = parse_expr();								// parse it like an ordinary expression
+	if (expr == NULL)											// check the result
+		return false;											// failure
 
+	// add it to the end of the main function expression list
 	if (last_main_expr != NULL) {
 		last_main_expr->next = expr;
 	} else {
@@ -486,7 +491,7 @@ static bool parse_top_lvl(void)
 	}
 	last_main_expr = expr;
 
-	return true;
+	return true;												// success
 }
 
 // parse an expression
