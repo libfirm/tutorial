@@ -548,8 +548,8 @@ static ir_node *handle_bin_expr(bin_expr_t *bin_ex, parameter_t *args)
 	switch (bin_ex->op) {
 	case '<':
 	{
-		ir_node *cmp = new_Cmp(lhs, rhs);			// compare lhs with rhs
-		return new_Proj(cmp, d_mode, pn_Cmp_Lt);	// is lhs less than rhs?
+		ir_node *cmp = new_Cmp(lhs, rhs, ir_relation_less);			// compare lhs with rhs
+		return new_Proj(cmp, d_mode, 0);	// is lhs less than rhs?
 	}
 	case '+':
 		return new_Add(lhs, rhs, d_mode);
@@ -659,9 +659,9 @@ static void create_func_graphs(void)
 		// create the projs for the parameters
 		if (n_param > 0) {
 			// keep track of the current block
-			ir_node *block = get_irg_current_block(fun_graph);
+			ir_node *block = get_cur_block();
 			// set the start block to be the current block
-			set_irg_current_block(fun_graph, get_irg_start_block(fun_graph));
+			set_cur_block(get_irg_start_block(fun_graph));
 			// get a reference to the arguments node
 			ir_node *args = get_irg_args(fun_graph);
 			
@@ -670,7 +670,7 @@ static void create_func_graphs(void)
 				p->proj = new_Proj(args, d_mode, i++);				// create a projection node
 			}
 
-			set_irg_current_block(fun_graph, block);				// restore the current block
+			set_cur_block(block);				// restore the current block
 		}
 		// the body is just an expression
 		ir_node *node = handle_expr(fn->body, fn->head->args);		
@@ -681,7 +681,7 @@ static void create_func_graphs(void)
 		// set the return node to be its predecessor
 		add_immBlock_pred(end, ret);								
 
-		mature_immBlock(get_irg_current_block(fun_graph));			// mature the current block
+		mature_immBlock(get_cur_block());			// mature the current block
 		mature_immBlock(end);										// mature the end block
 
 		irg_finalize_cons(fun_graph);								// finalize the construction
@@ -709,7 +709,7 @@ static void create_main(void)
 	ir_node *ret = new_Return(cur_store, 1, result);
 	add_immBlock_pred(get_irg_end_block(fn_main), ret);
 	// mature the current and the end block
-	mature_immBlock(get_irg_current_block(fn_main));
+	mature_immBlock(get_cur_block());
 	mature_immBlock(get_irg_end_block(fn_main));
 	// set it as the main function
 	set_irp_main_irg(fn_main);
@@ -787,7 +787,7 @@ int main(int argc, char **argv)
 		create_main();
 
 		if (opt_dump) 							// dump all graphs
-			dump_all_ir_graphs(&dump_ir_block_graph, "");
+			dump_all_ir_graphs("");
 
 		char *asm_name = gen_asm_name(prog_name);
 		FILE *out = NULL;
