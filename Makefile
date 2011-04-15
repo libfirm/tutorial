@@ -3,7 +3,7 @@
 all: frontend libkaleidoscope kal.sh
 	./kal.sh
 
-debug:
+debug: frontend.c
 	gcc -Wall -std=c99 -ggdb $< `pkg-config --cflags --libs libfirm` -o $@
 
 frontend: frontend.c
