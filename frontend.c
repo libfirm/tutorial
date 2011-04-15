@@ -32,7 +32,7 @@ static ir_mode *d_mode;				// the double mode
 static ir_type *d_type;				// the double type
 static ir_node *cur_store;			// keeps track of the current store
 
-// ************************** Error *****************************
+/* ********************************* Error ********************************* */
 
 // error printing
 static void error(char *msg, char *info)
@@ -40,7 +40,7 @@ static void error(char *msg, char *info)
 	fprintf(stderr, "Error: %s%s.\n", msg, info);
 }
 
-// ************ Lexer ************************************
+/* ********************************* Lexer ********************************* */
 
 // the lexer's tokens
 enum token_t {
@@ -124,7 +124,7 @@ static int next_token(void)
 	return cur_token;
 }
 
-// ************************** AST ***************************************
+/* ********************************** AST ********************************** */
 
 // ahead declaration
 typedef struct parameter_t parameter_t;
@@ -140,7 +140,7 @@ typedef enum expr_kind {
 // container struct for all kinds of expressions
 struct expr_t {
 	void *expr;				// the actual expression
-	expr_kind which;		// it's kind
+	expr_kind which;		// its kind
 
 	expr_t *next;			// pointer to the next expression
 };
@@ -254,7 +254,7 @@ static function_t *new_function(prototype_t *head, expr_t *body)
 	return f;
 }
 
-// ********************* Parser *************************
+/* ******************************** Parser ********************************* */
 
 // ahead declaration
 static expr_t *parse_expr(void);
@@ -533,7 +533,7 @@ static bool parser_loop(void)
 	return false;
 }
 
-// ********************* to firm ***********************
+/* ********************************* Firm ********************************** */
 
 // ahead declaration
 static ir_node *handle_expr(expr_t *expr, parameter_t *args);
@@ -713,10 +713,11 @@ static void create_main(void)
 	mature_immBlock(get_irg_end_block(fn_main));
 	// set it as the main function
 	set_irp_main_irg(fn_main);
+	// finalize the construction
 	irg_finalize_cons(fn_main);
 }
 
-// ******************* Main *************************
+/* ********************************** Main ********************************* */
 
 // extract the program name from the source file name
 static char *gen_prog_name(char *source_name)
@@ -770,7 +771,7 @@ int main(int argc, char **argv)
 	input = fopen(src_name, "r");
 
 	// error checking
-	if (src_name == NULL) {
+	if (input == NULL) {
 		error("Could not open source file", "");
 		exit(1);
 	}
