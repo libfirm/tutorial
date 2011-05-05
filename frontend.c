@@ -684,7 +684,8 @@ static void create_func_graphs(void)
 		mature_immBlock(get_cur_block());			// mature the current block
 		mature_immBlock(end);										// mature the end block
 
-		irg_finalize_cons(fun_graph);								// finalize the construction
+		irg_finalize_cons(fun_graph);                          // finalize the construction
+		add_irp_irg(fun_graph);
 	}
 }
 
@@ -778,7 +779,8 @@ int main(int argc, char **argv)
 
 	if (parser_loop()) {						// run the parser loop
 		ir_init(NULL);							// initialize libfirm
-		new_ir_prog(prog_name);					// create a new program
+		ir_prog *program = new_ir_prog(prog_name);					// create a new program
+		set_irp(program);
 		d_mode = get_modeD();					// set d_mode to the double mode
 		d_type = new_type_primitive(d_mode);	// create the primitive double type
 		// create the graphs
