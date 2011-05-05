@@ -13,6 +13,6 @@ libkaleidoscope: libkaleidoscope.c
 	gcc -Wall -c $<
 
 clean: clean.sh
-	rm -f frontend libkaleidoscope.o
+	rm -f frontend debug libkaleidoscope.o
 	./clean.sh
 
