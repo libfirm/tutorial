@@ -700,6 +700,8 @@ static void create_main(void)
 	ir_graph *fn_main = new_ir_graph(ent, 0);
 	// set it as the main function
 	set_irp_main_irg(fn_main);
+	// set it as the current ir_graph
+	set_current_ir_graph(fn_main);
 
 	cur_store = get_irg_initial_mem(fn_main);
 
