@@ -655,6 +655,9 @@ static void create_func_graphs(void)
 	for (function_t *fn = functions; fn != NULL; fn = fn->next) {
 		int n_param = fn->head->argc;
 		ir_graph *fun_graph = new_ir_graph(fn->head->ent, n_param);	// create a new graph
+		// set it as the current ir_graph
+		set_current_ir_graph(fun_graph);
+
 		cur_store = get_irg_initial_mem(fun_graph);					// update the cur_store pointer
 		// create the projs for the parameters
 		if (n_param > 0) {
@@ -698,8 +701,6 @@ static void create_main(void)
 	ir_entity *ent = new_entity(get_glob_type(), new_id_from_str("main"), type);
 	// create a fresh graph
 	ir_graph *fn_main = new_ir_graph(ent, 0);
-	// set it as the main function
-	set_irp_main_irg(fn_main);
 	// set it as the current ir_graph
 	set_current_ir_graph(fn_main);
 
@@ -719,6 +720,8 @@ static void create_main(void)
 	mature_immBlock(get_irg_end_block(fn_main));
 	// finalize the construction
 	irg_finalize_cons(fn_main);
+	// set it as the main function
+	set_irp_main_irg(fn_main);
 }
 
 /* ********************************** Main ********************************* */
