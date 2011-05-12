@@ -698,6 +698,9 @@ static void create_main(void)
 	ir_entity *ent = new_entity(get_glob_type(), new_id_from_str("main"), type);
 	// create a fresh graph
 	ir_graph *fn_main = new_ir_graph(ent, 0);
+	// set it as the main function
+	set_irp_main_irg(fn_main);
+
 	cur_store = get_irg_initial_mem(fn_main);
 
 	// handle each expression and keep a reference to the last one
@@ -712,8 +715,6 @@ static void create_main(void)
 	// mature the current and the end block
 	mature_immBlock(get_cur_block());
 	mature_immBlock(get_irg_end_block(fn_main));
-	// set it as the main function
-	set_irp_main_irg(fn_main);
 	// finalize the construction
 	irg_finalize_cons(fn_main);
 }
