@@ -785,8 +785,9 @@ int main(int argc, char **argv)
 
 	if (parser_loop()) {						// run the parser loop
 		ir_init(NULL);							// initialize libfirm
-		ir_prog *program = new_ir_prog(prog_name);					// create a new program
-		set_irp(program);
+//		ir_prog *program = new_ir_prog(prog_name);					// create a new program
+//		set_irp(program);
+		set_irp_prog_name(new_id_from_str(prog_name));
 		d_mode = get_modeD();					// set d_mode to the double mode
 		d_type = new_type_primitive(d_mode);	// create the primitive double type
 		// create the graphs
