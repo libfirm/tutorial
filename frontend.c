@@ -793,6 +793,7 @@ int main(int argc, char **argv)
 		create_prototype_entities();
 		create_func_graphs();
 		create_main();
+		irp_finalize_cons();
 
 		if (opt_dump) 							// dump all graphs
 			dump_all_ir_graphs("");
