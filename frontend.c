@@ -695,6 +695,9 @@ static void create_func_graphs(void)
 // create the main graph
 static void create_main(void)
 {
+	if (main_exprs == NULL)
+		return;
+
 	ir_type *type = new_type_method(0, 1);							// create the type
 	set_method_res_type(type, 0, d_type);							// set the result type
 	// create an entity
