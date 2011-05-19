@@ -688,7 +688,6 @@ static void create_func_graphs(void)
 		mature_immBlock(end);										// mature the end block
 
 		irg_finalize_cons(fun_graph);                          // finalize the construction
-		add_irp_irg(fun_graph);
 	}
 }
 
