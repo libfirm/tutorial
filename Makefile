@@ -1,16 +1,18 @@
+CFLAGS = -Wall -std=c99 $(shell pkg-config --cflags --libs libfirm)
+
 .PHONY: all clean
 
 all: frontend libkaleidoscope kal.sh
 	./kal.sh
 
 debug: frontend.c
-	gcc -Wall -std=c99 -ggdb $< `pkg-config --cflags --libs libfirm` -o $@
+	${CC} -ggdb $< ${CFLAGS} -o $@
 
 frontend: frontend.c
-	gcc -std=c99 $< `pkg-config --cflags --libs libfirm` -o $@
+	${CC} $< ${CFLAGS} -o $@
 
 libkaleidoscope: libkaleidoscope.c
-	gcc -Wall -c $<
+	${CC} ${CFLAGS} -c $<
 
 clean: clean.sh
 	rm -f frontend debug libkaleidoscope.o
