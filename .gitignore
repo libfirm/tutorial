@@ -1,5 +1,13 @@
 *.vcg
 *.o
 *.s
-frontend
-debug
+/tutorial
+/debug
+/config.mak
+/tutorial.log
+/tutorial.aux
+/tutorial.tex
+/tutorial.c
+/simple.kal
+/io.kal
+/tutorial.pdf
