@@ -796,6 +796,7 @@ First we need to create a fresh graph using the constructor [[ir_graph *new_ir_g
 
 <<ast2firm>>=
 		ir_graph *fun_graph = new_ir_graph(fn->head->ent, n_param); // create a new graph
+		set_current_ir_graph(fun_graph);
 @
 
 Now we can create projections for each of the function parameters. We store these projections in the args field of the function prototype.
@@ -1016,6 +1017,7 @@ static void create_main(void)
 	ir_entity *ent = new_entity(get_glob_type(), new_id_from_str("main"), type);
 	// create a fresh graph
 	ir_graph *fn_main = new_ir_graph(ent, 0);
+	set_current_ir_graph(fn_main);
 
 	// handle each expression and keep a reference to the last one
 	ir_node *node = NULL;
