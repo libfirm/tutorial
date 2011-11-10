@@ -1,4 +1,4 @@
-/* The functions in this file can be accessed from Kaleidoscope programs. */
+/* The functions in this file can be accessed from Simple programs. */
 
 #include <stdio.h>
 

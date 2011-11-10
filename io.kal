@@ -1,5 +1,0 @@
-extern putchard(c)
-extern getchard()
-
-# read a character in and print it out again
-putchard(getchard())

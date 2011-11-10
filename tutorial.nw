@@ -6,10 +6,10 @@
 \begin{document}
 
 This tutorial explains how to implement your own language using the Firm library. Before reading any further, you should read the [[Introduction]] to get an idea of the Firm library.
-We will create a frontend for a simple language called Kaleidoscope, to teach you the libFirm interface, starting with the lexer working our way up to the main function.
+We will create a frontend for a simple language called ``Simple'', to teach you the libFirm interface, starting with the lexer working our way up to the main function.
 To give an example of what we want to achieve, consider the following function.
 
-<<simple.kal>>=
+<<simple.simple>>=
 def plus(a b)
 	a + b
 @
@@ -222,7 +222,7 @@ static expr_t *new_expr(void *expr, expr_kind which)
 @
 
 \subsection{Number Expressions}
-The single data type in the Kaleidoscope language are double precision floating point numbers.
+The single data type in the Simple language are double precision floating point numbers.
 <<types>>=
 typedef struct num_expr_t {
 	double val;             // the double value of a number
@@ -295,7 +295,7 @@ static call_expr_t *new_call_expr(char *callee, expr_t *args, int argc)
 	c->callee = callee;
 	c->args = args;
 	c->argc = argc;
-	return c;   
+	return c;
 }
 
 @
@@ -305,7 +305,7 @@ With prototypes we support ahead declarations and the use of extern functions.
 <<types>>=
 typedef struct parameter_t parameter_t; // forward declaration
 struct parameter_t {
-	char *name;				// the parameter name
+	char *name;             // the parameter name
 	ir_node *proj;
 
 	parameter_t *next;
@@ -761,7 +761,7 @@ static void create_prototype_entities(void)
 For each prototype the following FIRM constructors are called:
 
 [[ir_type *new_type_method(int n_param, int n_res);]]
-The [[ir_type]] keeps track of the number of parameters and results of the function. We set the type of each parameter and the single result to double as this is the only data type in the kaleidoscope language.
+The [[ir_type]] keeps track of the number of parameters and results of the function. We set the type of each parameter and the single result to double as this is the only data type in the simple language.
 
 [[d_type]] and [[d_mode]] are global variables of the frontend:
 <<global variables>>=
@@ -770,8 +770,8 @@ static ir_type *d_type;             // the double type
 @
 They are initialized in the main function:
 <<initialize modes and types>>=
-	d_mode = get_modeD();                   // set d_mode to the double mode
-	d_type = new_type_primitive(d_mode);    // create the primitive double type
+d_mode = get_modeD();                   // set d_mode to the double mode
+d_type = new_type_primitive(d_mode);    // create the primitive double type
 @
 
 [[ir_entity *new_entity(ir_type *owner, ident *name, ir_type *tp);]]
@@ -1204,7 +1204,7 @@ double getchard()
 
 To use these functions we need to declare them using the extern keyword.
 
-<<io.kal>>=
+<<io.simple>>=
 extern putchard(c)
 extern getchard()
 

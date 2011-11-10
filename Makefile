@@ -4,16 +4,19 @@ FIRM_LIBS ?= $(shell pkg-config --libs libfirm)
 
 CFLAGS = -Wall -std=c99 $(FIRM_CFLAGS)
 LFLAGS = $(FIRM_LIBS)
+TANGLEFLAGS = -t8
 
-TANGLED_FILES = io.kal simple.kal
+TANGLED_FILES = io.simple simple.simple
 
-.PHONY: all clean
+.PHONY: all clean runtests
 
-all: tutorial libkaleidoscope kal.sh tutorial.pdf $(TANGLED_FILES)
-	./kal.sh
+all: tutorial libsimple tutorial.pdf $(TANGLED_FILES) runtests
 
-%.kal: tutorial.nw
-	notangle -R$@ $< > $@
+runtests: runtests.sh tutorial
+	./runtests.sh
+
+$(TANGLED_FILES): tutorial.nw
+	notangle ${TANGLEFLAGS} -R$@ $< > $@
 
 tutorial.tex: tutorial.nw
 	noweave -delay $< > $@
@@ -22,7 +25,7 @@ tutorial.pdf: tutorial.tex
 	pdflatex tutorial.tex
 
 tutorial.c: tutorial.nw
-	notangle $< > $@
+	notangle ${TANGLEFLAGS} $< > $@
 
 debug: tutorial.c
 	${CC} -g3 $< ${LFLAGS} ${LFLAGS} -o $@
@@ -30,12 +33,11 @@ debug: tutorial.c
 tutorial: tutorial.c
 	${CC} $< ${CFLAGS} ${LFLAGS} -o $@
 
-libkaleidoscope: libkaleidoscope.c
+libsimple: libsimple.c
 	${CC} ${CFLAGS} -c $<
 
-clean: clean.sh
-	rm -f tutorial debug libkaleidoscope.o
+clean:
+	rm -f tutorial debug libsimple.o
 	rm -f tutorial.c $(TANGLED_FILES)
 	rm -f tutorial.tex tutorial.pdf tutorial.aux tutorial.log
-	./clean.sh
-
+	rm -f *.s
