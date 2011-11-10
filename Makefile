@@ -6,7 +6,7 @@ CFLAGS = -Wall -std=c99 $(FIRM_CFLAGS)
 LFLAGS = $(FIRM_LIBS)
 TANGLEFLAGS = -t8
 
-TANGLED_FILES = io.simple simple.simple
+TANGLED_FILES = io.simple example.simple
 
 .PHONY: all clean runtests
 

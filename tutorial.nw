@@ -9,9 +9,12 @@ This tutorial explains how to implement your own language using the Firm library
 We will create a frontend for a simple language called ``Simple'', to teach you the libFirm interface, starting with the lexer working our way up to the main function.
 To give an example of what we want to achieve, consider the following function.
 
-<<simple.simple>>=
+<<example.simple>>=
 def plus(a b)
 	a + b
+
+extern print(number)
+print(plus(5,9))
 @
 
 It takes two arguments and returns their sum. Here we have its Firm graph:
@@ -830,9 +833,9 @@ For the function to return something, we need to create a return node and set it
 
 <<ast2firm>>=
 		// the result of the function is the result of the body
-		ir_node **result = &node;
+		ir_node *results[1] = { node };
 		ir_node *store = get_store();
-		ir_node *ret = new_Return(store, 1, result);            // create a return node
+		ir_node *ret = new_Return(store, 1, results);               // create a return node
 		ir_node *end = get_irg_end_block(fun_graph);                // get hold of the end block
 		// set the return node to be its predecessor
 		add_immBlock_pred(end, ret);
@@ -865,19 +868,19 @@ static ir_node *handle_expr(expr_t *expr, parameter_t *args); // forward declara
 static ir_node *handle_expr(expr_t *expr, parameter_t *args)
 {
 	switch (expr->which) {
-		case EXPR_NUM:
-			{
-				num_expr_t *num = (num_expr_t *) expr->expr;                    // cast to num_expr_t
-				return new_Const(new_tarval_from_double(num->val, d_mode));     // create a constant
-			}
-		case EXPR_BIN:
-			return handle_bin_expr((bin_expr_t *) expr->expr, args);
-		case EXPR_VAR:
-			return handle_var_expr((var_expr_t *) expr->expr, args);
-		case EXPR_CALL:
-			return handle_call_expr((call_expr_t *) expr->expr, args);
-		default:
-			return NULL;
+	case EXPR_NUM:
+		{
+			num_expr_t *num = (num_expr_t *) expr->expr;                    // cast to num_expr_t
+			return new_Const(new_tarval_from_double(num->val, d_mode));     // create a constant
+		}
+	case EXPR_BIN:
+		return handle_bin_expr((bin_expr_t *) expr->expr, args);
+	case EXPR_VAR:
+		return handle_var_expr((var_expr_t *) expr->expr, args);
+	case EXPR_CALL:
+		return handle_call_expr((call_expr_t *) expr->expr, args);
+	default:
+		abort();
 	}
 }
 
@@ -1024,10 +1027,14 @@ static void create_main(void)
 	for (expr_t *e = main_exprs; e != NULL; e = e->next) {
 		node = handle_expr(e, NULL);
 	}
+	/* just use a 0 constant if there were no expressions */
+	if (node == NULL) {
+		node = new_Const(get_mode_null(d_mode));
+	}
 	// get the result
-	ir_node **result = &node;
 	ir_node *store = get_store();
-	ir_node *ret = new_Return(store, 1, result);
+	ir_node *results[1] = { node };
+	ir_node *ret = new_Return(store, 1, results);
 	add_immBlock_pred(get_irg_end_block(fn_main), ret);
 	// mature the current and the end block
 	mature_immBlock(get_r_cur_block(fn_main));
