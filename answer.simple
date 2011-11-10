@@ -1,0 +1,3 @@
+extern print(c)
+
+print(42)

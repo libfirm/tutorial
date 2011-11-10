@@ -12,3 +12,16 @@ double getchard()
 {
 	return (double) getchar();
 }
+
+double read(void)
+{
+	double d = 0;
+	if (scanf("%lf", &d) == 0)
+		return 0;
+	return d;
+}
+
+void print(double d)
+{
+	printf("%f\n", d);
+}
