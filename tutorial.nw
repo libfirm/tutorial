@@ -671,7 +671,7 @@ static bool parse_definition(void)
 
 \subsection{Top Level Expression Parsing}
 
-Expressions at the top level are parsed and then added to the main function. 
+Expressions at the top level are parsed and then added to the [[__simple_main]] function. Our runtime library will take care that program execution starts at the [[__simple_main]] function.
 
 <<parser>>=
 // parse an expression
@@ -1023,7 +1023,7 @@ static void create_main(void)
 	ir_type *type = new_type_method(0, 1);                          // create the type
 	set_method_res_type(type, 0, d_type);                           // set the result type
 	// create an entity
-	ir_entity *ent = new_entity(get_glob_type(), new_id_from_str("main"), type);
+	ir_entity *ent = new_entity(get_glob_type(), new_id_from_str("__simple_main"), type);
 	// create a fresh graph
 	ir_graph *fn_main = new_ir_graph(ent, 0);
 	set_current_ir_graph(fn_main);
@@ -1045,8 +1045,6 @@ static void create_main(void)
 	// mature the current and the end block
 	mature_immBlock(get_r_cur_block(fn_main));
 	mature_immBlock(get_irg_end_block(fn_main));
-	// set it as the main function
-	set_irp_main_irg(fn_main);
 	// finalize the construction
 	irg_finalize_cons(fn_main);
 }

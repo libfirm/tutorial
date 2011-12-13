@@ -25,3 +25,13 @@ void print(double d)
 {
 	printf("%f\n", d);
 }
+
+/** the runtime library provides a "C" main function. Which calls the
+ * __simple_main function of a program */
+int main(void)
+{
+	extern double __simple_main(void);
+	__simple_main();
+	return 0;
+}
+
