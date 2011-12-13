@@ -5,7 +5,13 @@
 
 \begin{document}
 
-This tutorial explains how to implement your own language using the Firm library. Before reading any further, you should read the [[Introduction]] to get an idea of the Firm library.
+\begin{titlepage}
+	\author{Julius Neuffer}
+	\title{Firm Frontend Tutorial}
+	\maketitle
+\end{titlepage}
+
+This tutorial explains how to implement your own language using the Firm library.
 We will create a frontend for a simple language called ``Simple'', to teach you the libFirm interface, starting with the lexer working our way up to the main function.
 To give an example of what we want to achieve, consider the following function.
 
@@ -19,7 +25,7 @@ print(plus(5,9))
 
 It takes two arguments and returns their sum. Here we have its Firm graph:
 
-\includegraphics[width=0.7\textwidth]{plus.png}
+\includegraphics[width=0.6\textwidth]{plus.png}
  
 And this is the code emitted by the x86 backend:
 <<assembler.s>>=
@@ -1222,65 +1228,5 @@ putchard(getchard())
 @
 
 \section{Playing with the language}
-
-%\section{FIRM API Reference}
-%
-%Here is a list of all the FIRM library functions to be found in this tutorial. You can look for them in their source files, each of them provides a comment to explain its functionality.
-%
-%\subsection{be.h}
-%*void dump_ir_block_graph(ir_graph *irg, const char *suffix);
-%
-%\subsection{ident.h}
-%* ident *new_id_from_str (const char *str);
-%
-%\subsection{ircons.h}
-%*void add_immBlock_pred(ir_node *immblock, ir_node *jmp);
-%*void mature_immBlock(ir_node *block);
-%*ir_node *new_Add(ir_node *op1, ir_node *op2, ir_mode *mode);
-%*ir_node *new_Call(ir_node *store, ir_node *callee, int arity, ir_node *in[], ir_type *tp);
-%*ir_node *new_Cmp(ir_node *op1, ir_node *op2);
-%*ir_node *new_Const(tarval *con);
-%*ir_node *new_Mul(ir_node *op1, ir_node *op2, ir_mode *mode);
-%*ir_node *new_Proj(ir_node *arg, ir_mode *mode, long proj);
-%*ir_node *new_Return(ir_node *store, int arity, ir_node *in[]);
-%*ir_node *new_Sub(ir_node *op1, ir_node *op2, ir_mode *mode);
-%*ir_node *new_SymConst_type(ir_mode *mode, union symconst_symbol value, symconst_kind kind, ir_type *tp);
-%
-%\subsection{irdump.h}
-%*void dump_all_ir_graphs(dump_graph_func *dump_graph, const char *suffix);
-%*void dump_ir_block_graph(ir_graph *irg, const char *suffix);
-%
-%\subsection{irgraph.h}
-%*ir_node *get_irg_args(const ir_graph *irg);
-%*ir_node *get_irg_end_block(const ir_graph *irg);
-%*ir_node *get_irg_initial_mem(const ir_graph *irg);
-%*ir_node *get_irg_start_block(const ir_graph *irg);
-%*ir_graph *new_ir_graph(ir_entity *ent, int n_loc);
-%
-%\subsection{irmode.h}
-%*ir_mode *get_modeD(void);
-%*ir_mode *get_modeM(void);
-%*ir_mode *get_modeP(void);
-%*ir_mode *get_modeT(void);
-%
-%\subsection{irprog.h}
-%*ir_type *get_glob_type(void);
-%*ir_prog *new_ir_prog(const char *name);
-%*void set_irp_main_irg(ir_graph *main_irg);
-%
-%\subsection{firm_common.h}
-%*void ir_finish(void);
-%*void ir_init(const firm_parameter_t *params);
-%
-%\subsection{typerep.h}
-%*ir_type *get_entity_type(const ir_entity *ent);
-%*ir_entity *new_entity(ir_type *owner, ident *name, ir_type *tp);
-%*ir_type *new_type_method(int n_param, int n_res);
-%*ir_type *new_type_primitive(ir_mode *mode);
-%*void set_method_param_type(ir_type *method, int pos, ir_type *tp);
-%*void set_method_res_type(ir_type *method, int pos, ir_type *tp);
-%
-%\subsection{tv.h}
-%*tarval *new_tarval_from_double(long double d, ir_mode *mode);
 
 \end{document}
