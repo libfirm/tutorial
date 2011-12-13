@@ -9,7 +9,7 @@ do
 		echo "Compile error"
 		RC=1
 	else
-		`gcc libsimple.o $assembly -o ${src%.simple}`
+		`gcc -m32 libsimple.o $assembly -o ${src%.simple}`
 		echo "ok"
 		echo "Running $src..."
 		./${src%.simple} < /dev/null || RC=1

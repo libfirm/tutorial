@@ -34,7 +34,7 @@ tutorial: tutorial.c
 	${CC} $< ${CFLAGS} ${LFLAGS} -o $@
 
 libsimple: libsimple.c
-	${CC} ${CFLAGS} -c $<
+	${CC} -m32 ${CFLAGS} -c $<
 
 clean:
 	rm -f tutorial debug libsimple.o
