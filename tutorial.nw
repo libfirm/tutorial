@@ -1,18 +1,14 @@
-\documentclass[a4paper]{scrartcl}
+.. highlight:: c
 
-\usepackage{noweb}
-\usepackage[pdftex]{graphicx}
+Firm Frontend Tutorial
+======================
 
-\begin{document}
+Contents:
 
-\begin{titlepage}
-	\author{Julius Neuffer}
-	\title{Firm Frontend Tutorial}
-	\maketitle
-\end{titlepage}
+.. toctree::
 
 This tutorial explains how to implement your own language using the Firm library.
-We will create a frontend for a simple language called ``Simple'', to teach you the libFirm interface, starting with the lexer working our way up to the main function.
+We will create a frontend for a simple language called ``Simple``, to teach you the libFirm interface, starting with the lexer working our way up to the main function.
 To give an example of what we want to achieve, consider the following function.
 
 <<example.simple>>=
@@ -25,33 +21,42 @@ print(plus(5,9))
 
 It takes two arguments and returns their sum. Here we have its Firm graph:
 
-\includegraphics[width=0.6\textwidth]{plus.png}
+.. image:: plus.png
  
 And this is the code emitted by the x86 backend:
 <<assembler.s>>=
-# -- Begin  plus
 .globl plus
     .type   plus, @function
 plus:
-    /* .L84: preds: none, freq: 1.000000 */
-    pushl %ebp                       /* ia32_Push T[268:14]  */                                          
-    movl %esp, %ebp                  /* be_Copy Iu[271:16]  */
-    fldl 8(%ebp)                     /* ia32_fld T[337:34]  */
-    faddl 16(%ebp)                   /* ia32_fadd E[340:37]  */
-    movl %ebp, %esp                  /* be_Copy Iu[297:40]  */
-    popl %ebp                        /* ia32_PopEbp T[298:41]  */
-    ret                              /* be_Return X[302:28]  */
+    pushl %ebp
+    movl %esp, %ebp
+    fldl 8(%ebp)
+    faddl 16(%ebp)
+    movl %ebp, %esp
+    popl %ebp
+    ret
     .size   plus, .-plus
-# -- End  plus
 @
 
-\section{The Language}
+Literate Programming
+--------------------
 
-The language will consist of only two keywords: ''def'' and ''extern''. With ''def'' you can define your own functions and ''extern'' is used to declare extern functions as well as ahead declaration. Additionally we support only a few binary operators: + and *. The only data type available will be double, making type declarations redundant.
+This tutorial is written as a literate program, this means combining all the code fragments in this document yields a complete program.
+All Code-Blocks are given names.
+To reference another code-block called [[Name]] the [[<<Name>>]] syntax is used.
 
-\section{The Lexer}
+The complete sourcecode can also be downloaded as a :download:`combined file <tutorial.c>`.
 
-\subsection{The Data}
+The Language
+============
+
+The language will consist of only two keywords: [[def]] and [[extern]]. With [[def]] you can define your own functions and [[extern]] is used to declare extern functions as well as ahead declaration. Additionally we support only a few binary operators: * and +. The only data type available will be double, making type declarations redundant.
+
+The Lexer
+=========
+
+The Data
+--------
 
 The tokens of the lexer are implemented as enum:
 
@@ -86,7 +91,8 @@ static double num_val;              // contains the value of any numbers
 
 If the current token is [[TOK_ID]] or [[TOK_NUM]], then the parser can expect to access the identifier via [[id_str]] or the number via [[num_val]] respectively.
 
-\subsection{The Function}
+The Function
+------------
 
 <<lexer>>=
 // returns the current token
@@ -177,7 +183,8 @@ static int next_token(void)
 
 @
 
-\section{The AST}
+The AST
+=======
 
 The AST comprises expressions, prototypes and functions. It is accessed via the following global variables:
 
@@ -204,7 +211,8 @@ typedef enum expr_kind {
 
 These are the data structures used to represent the program structure. Each is shown along with its constructor:
 
-\subsection{Generic Expressions}
+Generic Expressions
+-------------------
 
 This is the base type for all expressions.
 <<types>>=
@@ -230,7 +238,9 @@ static expr_t *new_expr(void *expr, expr_kind which)
 }
 @
 
-\subsection{Number Expressions}
+Number Expressions
+------------------
+
 The single data type in the Simple language are double precision floating point numbers.
 <<types>>=
 typedef struct num_expr_t {
@@ -247,7 +257,9 @@ static num_expr_t *new_num_expr(double val)
 }
 @
 
-\subsection{Variable Expressions}
+Variable Expressions
+--------------------
+
 These expressions represent an identifier.
 <<types>>=
 typedef struct var_expr_t {
@@ -265,7 +277,9 @@ static var_expr_t *new_var_expr(char *name)
 
 @
 
-\subsection{Binary Expressions}
+Binary Expressions
+------------------
+
 Binary expressions consist of a left hand side, an operator and a right hand side.
 <<types>>=
 typedef struct bin_expr_t {
@@ -286,7 +300,9 @@ static bin_expr_t *new_bin_expr(char op, expr_t *lhs, expr_t *rhs)
 
 @
 
-\subsection{Call Expressions}
+Call Expressions
+----------------
+
 We need to keep track of what to call and what the arguments are.
 <<types>>=
 typedef struct call_expr_t {
@@ -309,7 +325,9 @@ static call_expr_t *new_call_expr(char *callee, expr_t *args, int argc)
 
 @
 
-\subsection{Prototypes}
+Prototypes
+----------
+
 With prototypes we support ahead declarations and the use of extern functions.
 <<types>>=
 typedef struct parameter_t parameter_t; // forward declaration
@@ -351,7 +369,8 @@ static prototype_t *new_prototype(char *name, parameter_t *args, int argc)
 
 @
 
-\subsection{Functions}
+Functions
+---------
 
 Each function consists of a head, represented by a [[prototype_t]] and a body, represented by an [[expr_t]].
 
@@ -376,7 +395,8 @@ static function_t *new_function(prototype_t *head, expr_t *body)
 
 @
 
-\section{The Parser}
+The Parser
+==========
 
 The interface to the parser is a single function which parses the source file into an abstract syntax tree:
 
@@ -396,7 +416,8 @@ static void error(char *msg, char *info)
 
 @
 
-\subsection{Identifier Expression Parsing}
+Identifier Expression Parsing
+-----------------------------
 
 <<parser>>=
 <<check call>>
@@ -474,7 +495,8 @@ static bool check_call(call_expr_t *call)
 
 @
 
-\subsection{Number Expression Parsing}
+Number Expression Parsing
+-------------------------
 
 All we need to do, is to wrap the number value in the number expression structure and discard the current token by calling [[next_token()]].
 
@@ -490,7 +512,9 @@ static expr_t *parse_num_expr(void)
 
 @
 
-\subsection{Parenthesis Expression Parsing}
+Parenthesis Expression Parsing
+------------------------------
+
 Parsing parenthesis expressions is simple, we discard the parentheses and parse the expression inside them.
 
 <<parser>>=
@@ -510,7 +534,8 @@ static expr_t *parse_paren_expr(void)
 
 @
 
-\subsection{Primary Parsing}
+Primary Parsing
+---------------
 
 This function is a wrapper for the primary expressions, i.e. the identifier, number and parenthesis expressions. It switches on the current token and decides which parser function to call.
 
@@ -535,7 +560,8 @@ static expr_t *parse_primary(void)
 
 @
 
-\subsection{Binary Expression Parsing}
+Binary Expression Parsing
+-------------------------
 
 To parse binary expressions, we're going to use an operator-precedence parser. Hier sollte ein Link zum passenden Wikipedia Artikel reinkommen.
 
@@ -585,7 +611,8 @@ static expr_t *parse_bin_rhs(int min_prec, expr_t *lhs)
 
 @
 
-\subsection{Prototype Parsing}
+Prototype Parsing
+-----------------
 
 To parse a function prototype we need to get the function name and create a [[parameter_t]] structure for it's parameter list. As we support ahead declarations we need to check if the prototype already exists in which case we don't need to create it again.
 
@@ -641,7 +668,8 @@ static prototype_t *parse_prototype(void)
 
 @
 
-\subsection{Function Definition Parsing}
+Function Definition Parsing
+---------------------------
 
 Function definitions consist of the head of the function which can be parsed as a prototype and the body which can be parsed as an expression.
 
@@ -669,7 +697,8 @@ static bool parse_definition(void)
 
 @
 
-\subsection{Top Level Expression Parsing}
+Top Level Expression Parsing
+----------------------------
 
 Expressions at the top level are parsed and then added to the [[__simple_main]] function. Our runtime library will take care that program execution starts at the [[__simple_main]] function.
 
@@ -707,7 +736,8 @@ As we keep the main function expressions in a singly linked list, we need to put
 
 @
 
-\subsection{Main Parser Loop}
+Main Parser Loop
+----------------
 
 This function iterates through the source file till it reaches the end, or an error occurs. In the loop it switches on the [[cur_token]], calling the corresponding parser function.
 
@@ -744,12 +774,14 @@ static bool parser_loop(void)
 
 @
 
-\section{Construction Of The Firm Graphs}
+Construction Of The Firm Graphs
+===============================
 
 In Firm programs are represented as graphs. The Firm library supplies several interfaces to construct these graphs, for this tutorial we will be using the most comfortable one.
 After the parser has built the AST, we are ready to construct the function graphs. We have to consider several tasks:
 
-\subsection{Creating The Entities}
+Creating The Entities
+---------------------
 
 <<ast2firm>>=
 // creates an entity for each prototype
@@ -787,7 +819,8 @@ d_type = new_type_primitive(d_mode);    // create the primitive double type
 
 The owner is the global type, the name is created from the function name, and the type is the one we just created. Note that we keep the pointer for each entity in the [[prototype_t]] struct itself, this will be useful later.
 
-\subsection{Constructing Function Graphs}
+Constructing Function Graphs
+----------------------------
 
 For each of the functions in the AST we have to take several steps. 
 
@@ -847,11 +880,10 @@ For the function to return something, we need to create a return node and set it
 		add_immBlock_pred(end, ret);
 @
 
-Finally we can mature the current block and the end block, which means fixing the number of their predecessors, and finalize the construction.
+Finally we can mature the current block, which means fixing the number of their predecessors, and finalize the construction.
 
 <<ast2firm>>=
 		mature_immBlock(get_r_cur_block(fun_graph));          // mature the current block
-		mature_immBlock(end);                                       // mature the end block
 
 		irg_finalize_cons(fun_graph);                               // finalize the construction
 	}
@@ -859,7 +891,8 @@ Finally we can mature the current block and the end block, which means fixing th
 
 @
 
-\subsection{Handling Expressions}
+Handling Expressions
+--------------------
 
 The body of a function is an expression, which itself can comprise several expressions. For each expression we encounter, we need to determine what kind of expression we're dealing with and then call the appropriate function to handle it.
 
@@ -894,7 +927,8 @@ static ir_node *handle_expr(expr_t *expr, parameter_t *args)
 
 Except for the [[num_expr_t]], for which we only have to create a constant using the [[ir_node *new_Const(tarval *con);]] function, we handle each kind of expression in a dedicated function.
 
-\subsubsection{Binary expressions}
+Binary expressions
+~~~~~~~~~~~~~~~~~~
 
 <<handle binary expressions>>=
 // generates the nodes for a binary expression
@@ -929,7 +963,8 @@ Now we can switch on the binary operator and create the corresponding node with 
 }
 @
 
-\subsubsection{Variable expressions}
+Variable expressions
+~~~~~~~~~~~~~~~~~~~~
 
 All we need to do here is to search the arguments of the function for the name matching the variable expressions name.
 
@@ -945,7 +980,9 @@ static ir_node *handle_var_expr(var_expr_t *var, parameter_t *args)
 
 @
 
-\subsubsection{Call expressions}
+Call expressions
+~~~~~~~~~~~~~~~~
+
 <<handle call expressions>>=
 // generates the nodes for the given call expression
 static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
@@ -1012,7 +1049,8 @@ The current store needs to be updated after the call.
 }
 @
 
-\subsection{Taking care of the top level expressions}
+Taking care of the top level expressions
+----------------------------------------
 
 This one is quite simple, we take all the top level expressions in the correct order and put them in the main function graph.
 
@@ -1042,18 +1080,19 @@ static void create_main(void)
 	ir_node *results[1] = { node };
 	ir_node *ret = new_Return(store, 1, results);
 	add_immBlock_pred(get_irg_end_block(fn_main), ret);
-	// mature the current and the end block
+	// mature the current block
 	mature_immBlock(get_r_cur_block(fn_main));
-	mature_immBlock(get_irg_end_block(fn_main));
 	// finalize the construction
 	irg_finalize_cons(fn_main);
 }
 
 @
 
-\section{The Rest}
+The Rest
+========
 
-\subsection{Naming Functions}
+Naming Functions
+----------------
 
 These two function manipulate file and program names.
 
@@ -1097,7 +1136,9 @@ static char *gen_asm_name(char *prog_name)
 
 @
 
-\subsection{The Main Function}
+The Main Function
+-----------------
+
 This is what the main function looks like. It checks the command line parameters, parses the source file, creates the Firm graphs, optionally dumps them, and emits the x86 assembly.
 
 <<main>>=
@@ -1177,7 +1218,8 @@ Emitting the code is as simple as calling the [[void be_main(FILE *output, const
 
 @
 
-\section{Putting it all together}
+Putting it all together
+=======================
 
 <<*>>=
 #include <stdlib.h>
@@ -1198,7 +1240,8 @@ Emitting the code is as simple as calling the [[void be_main(FILE *output, const
 <<main>>
 @
 
-\section{Extending The Language}
+Extending The Language
+======================
 
 The language can be easily extended with library functions written in C.
 For example we might want to add some way to perform basic input/output operations.
@@ -1225,6 +1268,3 @@ extern getchard()
 putchard(getchard())
 @
 
-\section{Playing with the language}
-
-\end{document}

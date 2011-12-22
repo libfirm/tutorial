@@ -4,10 +4,8 @@
 /tutorial
 /debug
 /config.mak
-/tutorial.log
-/tutorial.aux
-/tutorial.tex
 /tutorial.c
 /example.simple
 /io.simple
-/tutorial.pdf
+/build
+/tutorial.rst

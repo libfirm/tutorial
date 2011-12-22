@@ -5,36 +5,40 @@ FIRM_LIBS ?= $(shell pkg-config --libs libfirm)
 CFLAGS = -Wall -std=c99 $(FIRM_CFLAGS)
 LFLAGS = $(FIRM_LIBS)
 TANGLEFLAGS = -t8
+BUILDDIR = build
 
 TANGLED_FILES = io.simple example.simple
 
-.PHONY: all clean runtests
+.PHONY: all documentation clean runtests
 
-all: tutorial libsimple tutorial.pdf $(TANGLED_FILES) runtests
+all: documentation tutorial libsimple.o $(TANGLED_FILES) runtests
 
-runtests: runtests.sh tutorial
+documentation: $(BUILDDIR)/tutorial.html
+
+runtests: runtests.sh libsimple.o tutorial
 	./runtests.sh
 
 $(TANGLED_FILES): tutorial.nw
-	notangle ${TANGLEFLAGS} -R$@ $< > $@
+	notangle $(TANGLEFLAGS) -R$@ $< > $@
 
-tutorial.tex: tutorial.nw
-	noweave -delay $< > $@
+tutorial.rst: tutorial.nw
+	mkdir -p $(BUILDDIR)
+	/usr/lib/noweb/markup -t4 < $< | python 2rst.py > $@
 
-tutorial.pdf: tutorial.tex
-	pdflatex tutorial.tex
+$(BUILDDIR)/tutorial.html: tutorial.rst conf.py
+	sphinx-build -b html . $(BUILDDIR)
 
 tutorial.c: tutorial.nw
-	notangle ${TANGLEFLAGS} $< > $@
+	notangle $(TANGLEFLAGS) $< > $@
 
 debug: tutorial.c
-	${CC} -g3 $< ${LFLAGS} ${LFLAGS} -o $@
+	$(CC) -g3 $< $(LFLAGS) $(LFLAGS) -o $@
 
 tutorial: tutorial.c
-	${CC} $< ${CFLAGS} ${LFLAGS} -o $@
+	$(CC) $< $(CFLAGS) $(LFLAGS) -o $@
 
-libsimple: libsimple.c
-	${CC} -m32 ${CFLAGS} -c $<
+libsimple.o: libsimple.c
+	$(CC) -m32 $(CFLAGS) -c $<
 
 clean:
 	rm -f tutorial debug libsimple.o
