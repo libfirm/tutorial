@@ -21,11 +21,11 @@ runtests: runtests.sh libsimple.o tutorial
 $(TANGLED_FILES): tutorial.nw
 	notangle $(TANGLEFLAGS) -R$@ $< > $@
 
-tutorial.rst: tutorial.nw
+index.rst: tutorial.nw
 	mkdir -p $(BUILDDIR)
 	/usr/lib/noweb/markup -t4 < $< | python 2rst.py > $@
 
-$(BUILDDIR)/tutorial.html: tutorial.c tutorial.rst conf.py
+$(BUILDDIR)/tutorial.html: tutorial.c index.rst conf.py
 	sphinx-build -b html . $(BUILDDIR)
 
 tutorial.c: tutorial.nw
