@@ -65,6 +65,6 @@ for line in sys.stdin:
 		endchunk = s[0]
 		if endchunk != chunk:
 			sys.stderr.write("%s: Mismatched endchunk (%s, expected %s)\n" % (linenum, endchunk, chunk))
-		if endchunk == "docs":
+		if endchunk == "docs" or endchunk == "code":
 			out.write("\n")
 		chunk = None

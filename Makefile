@@ -2,7 +2,7 @@
 FIRM_CFLAGS ?= $(shell pkg-config --cflags libfirm)
 FIRM_LIBS ?= $(shell pkg-config --libs libfirm)
 
-CFLAGS = -Wall -std=c99 $(FIRM_CFLAGS)
+CFLAGS = -Wall -W -std=c99 $(FIRM_CFLAGS)
 LFLAGS = $(FIRM_LIBS)
 TANGLEFLAGS = -t8
 BUILDDIR = build
@@ -21,9 +21,9 @@ runtests: runtests.sh libsimple.o tutorial
 $(TANGLED_FILES): tutorial.nw
 	notangle $(TANGLEFLAGS) -R$@ $< > $@
 
-index.rst: tutorial.nw
+index.rst: tutorial.nw 2rst.py
 	mkdir -p $(BUILDDIR)
-	/usr/lib/noweb/markup -t4 < $< | python 2rst.py > $@
+	/usr/lib/noweb/markup -t < $< | python 2rst.py > $@
 
 $(BUILDDIR)/tutorial.html: tutorial.c index.rst conf.py
 	sphinx-build -b html . $(BUILDDIR)
