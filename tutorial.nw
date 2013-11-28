@@ -563,7 +563,9 @@ static expr_t *parse_primary(void)
 Binary Expression Parsing
 -------------------------
 
-To parse binary expressions, we're going to use an operator-precedence parser. Hier sollte ein Link zum passenden Wikipedia Artikel reinkommen.
+To parse binary expressions, we're going to use an operator-precedence parser.
+
+.. Hier sollte ein Link zum passenden Wikipedia Artikel reinkommen.
 
 <<parser>>=
 // returns the precedence of the current token
