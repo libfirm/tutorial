@@ -1,5 +1,5 @@
 This is a firm-tutorial originally written by Julius Neuffer.
 
 The tutorial is a literate program now. You need to have the noweb tool
-installed to extract the sourcecode. The Makefile will then do the extraction
+installed to extract the source code. The Makefile will then do the extraction
 for you.
