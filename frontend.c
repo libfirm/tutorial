@@ -588,7 +588,7 @@ static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 	for (prototype_t *p = prototypes; p != NULL; p = p->next) {
 		if (!strcmp(p->name, call->callee)) {
 			ent = p->ent;
-			callee = new_SymConst(get_modeP(), (symconst_symbol) ent, symconst_addr_ent);
+			callee = new_Address(ent);
 			break;
 		}
 	}

@@ -999,14 +999,14 @@ static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 		in = calloc(call->argc, sizeof(ir_node **));
 @
 
-We need to look up the corresponding prototype and create a symbolic constant for it using [[ir_node *new_SymConst(ir_mode *mode, union symconst_symbol value, symconst_kind kind);]]
+We need to look up the corresponding prototype and create a node representing its address using [[ir_node *new_Address(ir_entity *entity);]]
 
 <<handle call expressions>>=
 		// find the corresponding prototype and create a symbolic constant
 		for (prototype_t *p = prototypes; p != NULL; p = p->next) {
 			if (!strcmp(p->name, call->callee)) {
 				ent = p->ent;
-				callee = new_SymConst(get_modeP(), (symconst_symbol) ent, symconst_addr_ent);
+				callee = new_Address(ent);
 				break;
 			}
 		}
