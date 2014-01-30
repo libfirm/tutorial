@@ -551,9 +551,9 @@ static expr_t *parse_primary(void)
 	case '(':
 		return parse_paren_expr();
 	default: {
-			char info[2] = { cur_token, '\0' };
-			error("Unknown token when expecting an expression: ", info);
-			return NULL;
+		char info[2] = { cur_token, '\0' };
+		error("Unknown token when expecting an expression: ", info);
+		return NULL;
 	}
 	}
 }
@@ -583,7 +583,7 @@ static int get_tok_prec(void)
 // parse the right hand side of a binary expression
 static expr_t *parse_bin_rhs(int min_prec, expr_t *lhs)
 {
-	while(1) {
+	while (true) {
 		// get the precedence of the current token
 		int tok_prec = get_tok_prec();
 		// if it is lower than the minimum precedence, return the lhs
@@ -902,11 +902,10 @@ static ir_node *handle_expr(expr_t *expr, parameter_t *args); // forward declara
 static ir_node *handle_expr(expr_t *expr, parameter_t *args)
 {
 	switch (expr->which) {
-	case EXPR_NUM:
-		{
-			num_expr_t *num = (num_expr_t *) expr->expr;                    // cast to num_expr_t
-			return new_Const(new_tarval_from_double(num->val, d_mode));     // create a constant
-		}
+	case EXPR_NUM: {
+		num_expr_t *num = (num_expr_t *) expr->expr;                    // cast to num_expr_t
+		return new_Const(new_tarval_from_double(num->val, d_mode));     // create a constant
+	}
 	case EXPR_BIN:
 		return handle_bin_expr((bin_expr_t *) expr->expr, args);
 	case EXPR_VAR:
