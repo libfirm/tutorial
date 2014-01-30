@@ -1044,9 +1044,7 @@ The current store needs to be updated after the call.
 	ir_node *tuple = new_Proj(call_node, get_modeT(), pn_Call_T_result);
 	result = new_Proj(tuple, d_mode, 0);
 
-	if (in != NULL) {
-		free(in);
-	}
+	free(in);
 	return result;
 }
 @
