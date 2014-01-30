@@ -653,18 +653,14 @@ static prototype_t *parse_prototype(void)
 
 	// if a prototype with this name already exists, don't create another one
 	for (prototype_t *p = prototypes; p != NULL; p = p->next) {
-		if (!strcmp(p->name, fn_name)) {
-			proto = p;
-			p = NULL;
-		}
+		if (!strcmp(p->name, fn_name))
+			return p;
 	}
 
-	if (proto == NULL) {
-		// the prototype doesn't already exist
-		proto = new_prototype(fn_name, args, argc);
-		proto->next = prototypes;
-		prototypes = proto;
-	}
+	// the prototype doesn't already exist
+	prototype_t *proto = new_prototype(fn_name, args, argc);
+	proto->next = prototypes;
+	prototypes  = proto;
 	return proto;
 }
 
