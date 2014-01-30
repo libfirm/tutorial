@@ -989,8 +989,6 @@ Call expressions
 // generates the nodes for the given call expression
 static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 {
-	ir_node *result = NULL;
-
 @
 
 We need to look up the corresponding prototype.
@@ -1039,8 +1037,8 @@ The current store needs to be updated after the call.
 	ir_node *new_store = new_Proj(call_node, get_modeM(), pn_Call_M);
 	set_store(new_store);
 	// get the result
-	ir_node *tuple = new_Proj(call_node, get_modeT(), pn_Call_T_result);
-	result = new_Proj(tuple, d_mode, 0);
+	ir_node *tuple  = new_Proj(call_node, get_modeT(), pn_Call_T_result);
+	ir_node *result = new_Proj(tuple, d_mode, 0);
 
 	free(in);
 	return result;
