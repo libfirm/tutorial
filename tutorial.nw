@@ -1002,25 +1002,25 @@ static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 We need to look up the corresponding prototype and create a node representing its address using [[ir_node *new_Address(ir_entity *entity);]]
 
 <<handle call expressions>>=
-		// find the corresponding prototype and create a symbolic constant
-		for (prototype_t *p = prototypes; p != NULL; p = p->next) {
-			if (!strcmp(p->name, call->callee)) {
-				ent = p->ent;
-				callee = new_Address(ent);
-				break;
-			}
+	// find the corresponding prototype and create a symbolic constant
+	for (prototype_t *p = prototypes; p != NULL; p = p->next) {
+		if (!strcmp(p->name, call->callee)) {
+			ent = p->ent;
+			callee = new_Address(ent);
+			break;
 		}
+	}
 @
 
 The arguments are also expressions, so we just need to call [[ir_node *handle_expr(expr_t *expr, param_list *plist);]]
 
 <<handle call expressions>>=
-		if (callee != NULL) {
-			// handle the arguments
-			int i = 0;
-			for (expr_t *e = call->args; e != NULL; e = e->next) {
-				in[i++] = handle_expr(e, args);
-			}
+	if (callee != NULL) {
+		// handle the arguments
+		int i = 0;
+		for (expr_t *e = call->args; e != NULL; e = e->next) {
+			in[i++] = handle_expr(e, args);
+		}
 @
 
 To create the call we use the [[ir_node *new_Call(ir_node *store, ir_node *callee, int arity, ir_node *in[], ir_type *tp);]] constructor.
