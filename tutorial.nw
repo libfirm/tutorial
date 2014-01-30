@@ -98,7 +98,6 @@ The Function
 // returns the current token
 static int get_token(void)
 {
-	int ret = 0;                                    // the return value
 	static int ch = ' ';                            // the current character
 	char buffer[BUFFER_SIZE];                       // the input buffer
 @
@@ -115,6 +114,7 @@ Now we either have to deal with alphanumeric characters, numbers, comments the e
 
 <<lexer>>=
 	// keyword or identifier
+	int ret;                                        // the return value
 	if (isalpha(ch)) {
 		// read in all successive alphanumeric characters
 		int i = 0;
@@ -435,7 +435,6 @@ Either the identifier is a call or a variable.
 	if (cur_token != '(') {                                         // it's not a call
 		id_expr = new_expr(new_var_expr(identifier), EXPR_VAR);     // hence it's a variable
 	} else {
-		call_expr_t *call;
 		expr_t *args = NULL;
 		int c = 0;                                                  // the number of arguments
 @
@@ -471,7 +470,7 @@ Parse the arguments of the call. They consist of expressions separated by commas
 
 		next_token();
 		// create the call expression
-		call = new_call_expr(identifier, args, c);
+		call_expr_t *call = new_call_expr(identifier, args, c);
 		if (check_call(call)) {                                     // check if the call is valid
 			id_expr = new_expr(call, EXPR_CALL);                    // wrap it up
 		}
@@ -623,7 +622,6 @@ To parse a function prototype we need to get the function name and create a [[pa
 // parse a prototype
 static prototype_t *parse_prototype(void)
 {
-	prototype_t *proto = NULL;
 	parameter_t *args = NULL;
 	int argc = 0;                                                   // number of arguments
 	char *fn_name = NULL;                                           // function name
@@ -676,13 +674,10 @@ Function definitions consist of the head of the function which can be parsed as 
 // parse the definition of a function
 static bool parse_definition(void)
 {
-	prototype_t *head = NULL;
-	expr_t *body = NULL;
-
 	next_token();
 
-	head = parse_prototype();                                   // its head is a prototype
-	body = parse_expr();                                        // its body is an expression
+	prototype_t *head = parse_prototype();                     // its head is a prototype
+	expr_t *body = parse_expr();                               // its body is an expression
 	// check the results
 	if (head != NULL && body != NULL) {
 		function_t *fn = new_function(head, body);             // create the function struct
@@ -1140,7 +1135,6 @@ This is what the main function looks like. It checks the command line parameters
 <<main>>=
 int main(int argc, char **argv)
 {
-	char *prog_name;
 	char *src_name = NULL;
 	bool opt_dump = false;                      // '-d' as the first argument enables dumping
 
@@ -1156,7 +1150,7 @@ int main(int argc, char **argv)
 	}
 
 	// open the source file
-	prog_name = gen_prog_name(src_name);
+	char *prog_name = gen_prog_name(src_name);
 	input = fopen(src_name, "r");
 
 	// error checking
