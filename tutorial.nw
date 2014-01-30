@@ -705,7 +705,8 @@ Expressions at the top level are parsed and then added to the [[__simple_main]] 
 static expr_t *parse_expr(void)
 {
 	expr_t *lhs = parse_primary();
-	if (!lhs) return NULL;
+	if (!lhs)
+		return NULL;
 
 	return parse_bin_rhs(0, lhs);
 }
@@ -971,7 +972,8 @@ All we need to do here is to search the arguments of the function for the name m
 static ir_node *handle_var_expr(var_expr_t *var, parameter_t *args)
 {
 	for (parameter_t *p = args; p != NULL; p = p->next) {
-		if (!strcmp(p->name, var->name)) return p->proj;
+		if (!strcmp(p->name, var->name))
+			return p->proj;
 	}
 	return NULL;
 }
