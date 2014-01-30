@@ -992,7 +992,6 @@ static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 	ir_node *callee = NULL;
 	ir_node **in = NULL;
 	ir_node *result = NULL;
-	ir_entity *ent = NULL;
 
 	// allocate space for an array referencing the arguments
 	if (call->argc > 0)
@@ -1003,7 +1002,12 @@ We need to look up the corresponding prototype and create a node representing it
 
 <<handle call expressions>>=
 	// find the corresponding prototype and create a symbolic constant
-	for (prototype_t *p = prototypes; p != NULL; p = p->next) {
+	ir_entity *ent;
+	for (prototype_t *p = prototypes;; p = p->next) {
+		if (p == NULL) {
+			error("Cannot call unknown function: ", call->callee);
+			return NULL;
+		}
 		if (!strcmp(p->name, call->callee)) {
 			ent = p->ent;
 			callee = new_Address(ent);
@@ -1015,34 +1019,30 @@ We need to look up the corresponding prototype and create a node representing it
 The arguments are also expressions, so we just need to call [[ir_node *handle_expr(expr_t *expr, param_list *plist);]]
 
 <<handle call expressions>>=
-	if (callee != NULL) {
-		// handle the arguments
-		int i = 0;
-		for (expr_t *e = call->args; e != NULL; e = e->next) {
-			in[i++] = handle_expr(e, args);
-		}
+	// handle the arguments
+	int i = 0;
+	for (expr_t *e = call->args; e != NULL; e = e->next) {
+		in[i++] = handle_expr(e, args);
+	}
 @
 
 To create the call we use the [[ir_node *new_Call(ir_node *store, ir_node *callee, int arity, ir_node *in[], ir_type *tp);]] constructor.
 
 <<handle call expressions>>=
-		// create the call
-		ir_node *store     = get_store();
-		ir_node *call_node = new_Call(store, callee, call->argc, in, get_entity_type(ent));
+	// create the call
+	ir_node *store     = get_store();
+	ir_node *call_node = new_Call(store, callee, call->argc, in, get_entity_type(ent));
 @
 
 The current store needs to be updated after the call.
 
 <<handle call expressions>>=
-		// update the current store
-		ir_node *new_store = new_Proj(call_node, get_modeM(), pn_Call_M);
-		set_store(new_store);
-		// get the result
-		ir_node *tuple = new_Proj(call_node, get_modeT(), pn_Call_T_result);
-		result = new_Proj(tuple, d_mode, 0);
-	} else {
-		error("Cannot call unknown function: ", call->callee);
-	}
+	// update the current store
+	ir_node *new_store = new_Proj(call_node, get_modeM(), pn_Call_M);
+	set_store(new_store);
+	// get the result
+	ir_node *tuple = new_Proj(call_node, get_modeT(), pn_Call_T_result);
+	result = new_Proj(tuple, d_mode, 0);
 
 	if (in != NULL) {
 		free(in);
