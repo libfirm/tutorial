@@ -989,12 +989,8 @@ Call expressions
 // generates the nodes for the given call expression
 static ir_node *handle_call_expr(call_expr_t *call, parameter_t *args)
 {
-	ir_node **in = NULL;
 	ir_node *result = NULL;
 
-	// allocate space for an array referencing the arguments
-	if (call->argc > 0)
-		in = calloc(call->argc, sizeof(ir_node **));
 @
 
 We need to look up the corresponding prototype.
@@ -1017,6 +1013,8 @@ We need to look up the corresponding prototype.
 The arguments are also expressions, so we just need to call [[ir_node *handle_expr(expr_t *expr, param_list *plist);]]
 
 <<handle call expressions>>=
+	// allocate space for an array referencing the arguments
+	ir_node **in = calloc(call->argc, sizeof(*in));
 	// handle the arguments
 	int i = 0;
 	for (expr_t *e = call->args; e != NULL; e = e->next) {
