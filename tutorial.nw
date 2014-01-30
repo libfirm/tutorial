@@ -236,6 +236,7 @@ static expr_t *new_expr(void *expr, expr_kind which)
 	e->which = which;
 	return e;
 }
+
 @
 
 Number Expressions
@@ -255,6 +256,7 @@ static num_expr_t *new_num_expr(double val)
 	n->val = val;
 	return n;
 }
+
 @
 
 Variable Expressions
@@ -350,7 +352,6 @@ struct prototype_t {
 
 @
 <<ast>>=
-
 static parameter_t *new_parameter(char *name)
 {
 	parameter_t *p = calloc(1, sizeof(parameter_t));
@@ -807,6 +808,7 @@ The [[ir_type]] keeps track of the number of parameters and results of the funct
 <<global variables>>=
 static ir_mode *d_mode;             // the double mode
 static ir_type *d_type;             // the double type
+
 @
 They are initialized in the main function:
 <<initialize modes and types>>=
@@ -825,7 +827,6 @@ For each of the functions in the AST we have to take several steps.
 
 <<ast2firm>>=
 <<handle expressions>>
-
 // creates an ir_graph for each function
 static void create_func_graphs(void)
 {
@@ -960,6 +961,7 @@ Now we can switch on the binary operator and create the corresponding node with 
 		return NULL;
 	}
 }
+
 @
 
 Variable expressions
@@ -1209,7 +1211,6 @@ Emitting the code is as simple as calling the [[void be_main(FILE *output, const
 
 	return 0;
 }
-
 @
 
 Putting it all together
