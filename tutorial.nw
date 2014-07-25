@@ -1089,51 +1089,6 @@ static void create_main(void)
 The Rest
 ========
 
-Naming Functions
-----------------
-
-These two function manipulate file and program names.
-
-The first function extracts the name of the program from the source file name. The name will be the name of the source file without its file extension.
-
-<<ast2firm>>=
-// extract the program name from the source file name
-static char *gen_prog_name(char *source_name)
-{
-	int len = strlen(source_name);
-	char *prog_name = calloc(len + 1, sizeof(char));
-
-	int i = 0;
-	// copy the prefix of the file name
-	while (source_name[i] != '.' && source_name[i] != '\0') {
-		prog_name[i] = source_name[i];
-		i++;
-	}
-	prog_name[i] = '\0';
-
-	return prog_name;
-}
-
-@
-
-The second function creates the name for the assembly file containing the emitted code. It appends the file extension ".s" to the program name.
-
-<<ast2firm>>=
-// generate a name for the assembly file
-static char *gen_asm_name(char *prog_name)
-{
-	int len = strlen(prog_name);
-	// allocate enough space for the name + ".s\0"
-	char *asm_name = calloc(len + 3, sizeof(char));
-
-	strcpy(asm_name, prog_name);
-	strncat(asm_name, ".s", 2);
-
-	return asm_name;
-}
-
-@
-
 The Main Function
 -----------------
 
@@ -1157,7 +1112,6 @@ int main(int argc, char **argv)
 	}
 
 	// open the source file
-	char *prog_name = gen_prog_name(src_name);
 	input = fopen(src_name, "r");
 
 	// error checking
@@ -1192,21 +1146,10 @@ To dump the graphs we call [[void dump_all_ir_graphs(const char *suffix);]] whic
 			dump_all_ir_graphs("");
 @
 
-Generate the filename for the assembly output file and open it.
+Emitting the code is as simple as calling the [[void be_main(FILE *output, const char *compilation_unit_name);]]. And finally we call [[void ir_finish(void);]] to free all the memory occupied by the Firm library. For simplicity we always emit the code to the standard output [[stdout]].
 
 <<main>>=
-		char *asm_name = gen_asm_name(prog_name);
-		FILE *out = NULL;
-		if ((out = fopen(asm_name, "w")) == NULL) {
-			error("Could not open output file ", asm_name);
-			exit(1);
-		}
-@
-
-Emitting the code is as simple as calling the [[void be_main(FILE *output, const char *compilation_unit_name);]]. And finally we call [[void ir_finish(void);]] to free all the memory occupied by the Firm library.
-
-<<main>>=
-		be_main(out, prog_name);                // emit code
+		be_main(stdout, src_name);              // emit code
 		ir_finish();                            // clean up
 	}
 

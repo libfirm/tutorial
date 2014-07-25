@@ -5,7 +5,7 @@ for src in `ls *.simple`
 do
 	echo -n "Compiling $src...  "
 	assembly=${src%.simple}.s
-	if ! `./tutorial $src`; then
+	if ! `./tutorial $src > $assembly`; then
 		echo "Compile error"
 		RC=1
 	else
