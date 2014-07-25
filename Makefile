@@ -2,7 +2,7 @@
 FIRM_CFLAGS ?= $(shell pkg-config --cflags libfirm)
 FIRM_LIBS ?= $(shell pkg-config --libs libfirm)
 
-CFLAGS = -Wall -W -std=c99 $(FIRM_CFLAGS)
+CFLAGS = -Wall -W -std=c99 $(FIRM_CFLAGS) -O0 -g3
 LFLAGS = $(FIRM_LIBS)
 TANGLEFLAGS = -t8
 BUILDDIR = build
