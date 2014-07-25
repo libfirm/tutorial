@@ -1231,6 +1231,7 @@ extern getchar()
 
 # read a character from input and print it out again
 putchar(getchar())
+0
 @
 
 <<answer.simple>>=
