@@ -1165,10 +1165,10 @@ If the parser loop returns true, we can start the creation of the Firm graph.
 	if (parser_loop()) {                        // run the parser loop
 @
 
-To initialize the Firm library the [[void ir_init();]] function is called, with [[NULL]] as argument, which results in the standard settings being used. Then we can create a new program with the [[ir_prog *new_ir_prog(const char *name);]] function.
+To initialize the Firm library the [[void ir_init();]] function is called, which results in the standard settings being used.
+
 <<main>>=
 		ir_init();                              // initialize libFirm
-		new_ir_prog(prog_name);                 // create a new program
 
 		<<initialize modes and types>>
 		// create the graphs
