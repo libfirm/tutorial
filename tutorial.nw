@@ -1113,10 +1113,8 @@ int main(int argc, char **argv)
 
 	// open the source file
 	input = fopen(src_name, "r");
-
-	// error checking
 	if (input == NULL) {
-		error("Could not open source file", "");
+		error("Could not open source file: ", strerror(errno));
 		exit(1);
 	}
 @
