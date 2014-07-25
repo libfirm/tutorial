@@ -1293,3 +1293,8 @@ extern getchar()
 putchar(getchar())
 @
 
+<<answer.simple>>=
+extern print(num)
+# Print the answer to life the universe and everything
+print(42)
+@
