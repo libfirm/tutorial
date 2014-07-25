@@ -50,7 +50,7 @@ The complete sourcecode can also be downloaded as a :download:`combined file <tu
 The Language
 ============
 
-The language will consist of only two keywords: [[def]] and [[extern]]. With [[def]] you can define your own functions and [[extern]] is used to declare extern functions as well as ahead declaration. Additionally we support only a few binary operators: * and +. The only data type available will be double, making type declarations redundant.
+The language will consist of only two keywords: [[def]] and [[extern]]. With [[def]] you can define your own functions and [[extern]] is used to declare extern functions as well as ahead declaration. Additionally we support only a few binary operators: * and +. The only data type available will be int, making type declarations redundant.
 
 The Lexer
 =========
@@ -85,7 +85,7 @@ These global variables present the current state of the lexer to the parser:
 // global variables needed by the parser
 static int cur_token;               // our current token
 static char *id_str;                // the identifier string
-static double num_val;              // contains the value of any numbers
+static int num_val;                 // contains the value of any numbers
 
 @
 
@@ -136,16 +136,16 @@ Now we either have to deal with alphanumeric characters, numbers, comments the e
 			strcpy(id_str, buffer);
 			ret = TOK_ID;
 		}
-	} else if (isdigit(ch)) {                       // the input is a number
-		// read in all successive digits or the decimal point
+	} else if (isdigit(ch)) {
+		// read in all successive digits
 		int i = 0;
 		do {
 			buffer[i++] = ch;
 			ch = fgetc(input);
-		} while (isdigit(ch) || ch == '.');
+		} while (isdigit(ch));
 		buffer[i] = '\0';
 
-		num_val = atof(buffer);                     // convert it to a double number
+		num_val = atoi(buffer);                // convert it to an int number
 		ret = TOK_NUM;
 	} else if (ch == '#') {
 		// after the comment character we can ignore the rest of the line
@@ -245,12 +245,12 @@ Number Expressions
 The single data type in the Simple language are double precision floating point numbers.
 <<types>>=
 typedef struct num_expr_t {
-	double val;             // the double value of a number
+	int val;             // the value of the number
 } num_expr_t;
 
 @
 <<ast>>=
-static num_expr_t *new_num_expr(double val)
+static num_expr_t *new_num_expr(int val)
 {
 	num_expr_t *n = calloc(1, sizeof(num_expr_t));
 	n->val = val;
@@ -783,10 +783,10 @@ Creating The Entities
 static void create_prototype_entities(void)
 {
 	for (prototype_t *proto = prototypes; proto != NULL; proto = proto->next) {
-		ir_type *proto_type = new_type_method(proto->argc, 1);      // create a method type
-		for (int i = 0; i < proto->argc; i++)                       // for each parameter
-			set_method_param_type(proto_type, i, d_type);           // set its type to double
-		set_method_res_type(proto_type, 0, d_type);                 // do the same for the result type
+		ir_type *proto_type = new_type_method(proto->argc, 1);  // create a method type
+		for (int i = 0; i < proto->argc; i++)                   // for each parameter
+			set_method_param_type(proto_type, i, int_type);     // set its type to double
+		set_method_res_type(proto_type, 0, int_type);           // do the same for the result type
 		// that's all we need to create the entity
 		proto->ent = new_entity(get_glob_type(), new_id_from_str(proto->name), proto_type);
 	}
@@ -799,16 +799,16 @@ For each prototype the following FIRM constructors are called:
 [[ir_type *new_type_method(int n_param, int n_res);]]
 The [[ir_type]] keeps track of the number of parameters and results of the function. We set the type of each parameter and the single result to double as this is the only data type in the simple language.
 
-[[d_type]] and [[d_mode]] are global variables of the frontend:
+[[int_type]] and [[int_mode]] are global variables of the frontend:
 <<global variables>>=
-static ir_mode *d_mode;             // the double mode
-static ir_type *d_type;             // the double type
+static ir_mode *int_mode;           // mode used for int
+static ir_type *int_type;           // type used for int
 
 @
 They are initialized in the main function:
 <<initialize modes and types>>=
-d_mode = get_modeD();                   // set d_mode to the double mode
-d_type = new_type_primitive(d_mode);    // create the primitive double type
+int_mode = mode_Is;
+int_type = new_type_primitive(int_mode);
 @
 
 [[ir_entity *new_entity(ir_type *owner, ident *name, ir_type *tp);]]
@@ -849,7 +849,7 @@ Now we can create projections for each of the function parameters. We store thes
 
 			int i = 0;                                              // for each argument
 			for (parameter_t *p = fn->head->args; p != NULL; p = p->next) {
-				p->proj = new_Proj(args, d_mode, i++);              // create a projection node
+				p->proj = new_Proj(args, int_mode, i++);      // create a projection node
 			}
 
 			set_r_cur_block(fun_graph, block);                // restore the current block
@@ -894,6 +894,7 @@ The body of a function is an expression, which itself can comprise several expre
 <<handle expressions>>=
 static ir_node *handle_expr(expr_t *expr, parameter_t *args); // forward declaration
 
+<<handle num expressions>>
 <<handle binary expressions>>
 <<handle variable expressions>>
 <<handle call expressions>>
@@ -902,10 +903,8 @@ static ir_node *handle_expr(expr_t *expr, parameter_t *args); // forward declara
 static ir_node *handle_expr(expr_t *expr, parameter_t *args)
 {
 	switch (expr->which) {
-	case EXPR_NUM: {
-		num_expr_t *num = (num_expr_t *) expr->expr;                    // cast to num_expr_t
-		return new_Const(new_tarval_from_double(num->val, d_mode));     // create a constant
-	}
+	case EXPR_NUM:
+        return handle_num_expr((num_expr_t *) expr->expr, args);
 	case EXPR_BIN:
 		return handle_bin_expr((bin_expr_t *) expr->expr, args);
 	case EXPR_VAR:
@@ -915,6 +914,19 @@ static ir_node *handle_expr(expr_t *expr, parameter_t *args)
 	default:
 		abort();
 	}
+}
+
+@
+
+Numbers in firm must be converted to target independent values, which are called tarvals in firm. So for number expressions we convert the contained integer value to a tarval. The tarval can then be used to create a Const node.
+
+<<handle num expressions>>=
+
+static ir_node *handle_num_expr(num_expr_t *num_expr, parameter_t *args)
+{
+    (void)args;
+    ir_tarval *tv = new_tarval_from_long(num_expr->val, mode_Is);
+    return new_Const(tv);
 }
 
 @
@@ -945,11 +957,11 @@ Now we can switch on the binary operator and create the corresponding node with 
 	case '<':
 		return new_Cmp(lhs, rhs, ir_relation_less); // compare lhs with rhs
 	case '+':
-		return new_Add(lhs, rhs, d_mode);
+		return new_Add(lhs, rhs, int_mode);
 	case '-':
-		return new_Sub(lhs, rhs, d_mode);
+		return new_Sub(lhs, rhs, int_mode);
 	case '*':
-		return new_Mul(lhs, rhs, d_mode);
+		return new_Mul(lhs, rhs, int_mode);
 	default:
 		error("Invalid binary expression", "");
 		return NULL;
@@ -1032,7 +1044,7 @@ The current store needs to be updated after the call.
 	set_store(new_store);
 	// get the result
 	ir_node *tuple  = new_Proj(call_node, get_modeT(), pn_Call_T_result);
-	ir_node *result = new_Proj(tuple, d_mode, 0);
+	ir_node *result = new_Proj(tuple, int_mode, 0);
 
 	free(in);
 	return result;
@@ -1048,8 +1060,8 @@ This one is quite simple, we take all the top level expressions in the correct o
 // create the main graph
 static void create_main(void)
 {
-	ir_type *type = new_type_method(0, 1);                          // create the type
-	set_method_res_type(type, 0, d_type);                           // set the result type
+	ir_type *type = new_type_method(0, 1);                // create the type
+	set_method_res_type(type, 0, int_type);               // set the result type
 	// create an entity
 	ir_entity *ent = new_entity(get_glob_type(), new_id_from_str("__simple_main"), type);
 	// create a fresh graph
@@ -1063,7 +1075,7 @@ static void create_main(void)
 	}
 	/* just use a 0 constant if there were no expressions */
 	if (node == NULL) {
-		node = new_Const(get_mode_null(d_mode));
+		node = new_Const(get_mode_null(int_mode));
 	}
 	// get the result
 	ir_node *store = get_store();
@@ -1228,31 +1240,56 @@ Putting it all together
 <<main>>
 @
 
+Runtime Library
+===============
+
+The runtime library of a compiler deals with the lower level interfacing with the operating system. The first thing we have to handle is starting the generated __simple_main function generated by the compiler. We will do this with a runtime library written in C:
+
+<<libruntime.c>>=
+/* Simple runtime library */
+#include <stdio.h>
+
+/* forward declaration of main function of simple program */
+int __simple_main(void);
+
+/** Provides a "C" main function which calls the __simple_main function of
+ * a simple program */
+int main(void)
+{
+	int res = __simple_main();
+	return res;
+}
+@
+
 Extending The Language
 ======================
 
-The language can be easily extended with library functions written in C.
-For example we might want to add some way to perform basic input/output operations.
-<<libtutorial.c>>=
-double putchard(double c)
+The language can be easily extended with library functions written in C. We can simply reuse any function from C which only takes arguments and returns of type int such as putchar/getchar. We can also write custom functions and include them in our runtime:
+<<libruntime.c>>=
+/** print a number followed by a linebreak */
+int print(int num)
 {
-	putchar((char) c);
-	return 0;
+    printf("%d\n", num);
+    return 0;
 }
 
-double getchard()
+/** read a number from input */
+int read(void)
 {
-	return (double) getchar();
+    int result = -1;
+    if (scanf("%d", &result) == 0)
+        return -1;
+    return result;
 }
 @
 
 To use these functions we need to declare them using the extern keyword.
 
 <<io.simple>>=
-extern putchard(c)
-extern getchard()
+extern putchar(c)
+extern getchar()
 
-# read a character in and print it out again
-putchard(getchard())
+# read a character from input and print it out again
+putchar(getchar())
 @
 

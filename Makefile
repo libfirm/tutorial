@@ -7,15 +7,15 @@ LFLAGS = $(FIRM_LIBS)
 TANGLEFLAGS = -t8
 BUILDDIR = build
 
-TANGLED_FILES = io.simple example.simple
+TANGLED_FILES = io.simple example.simple libruntime.c
 
 .PHONY: all documentation clean runtests
 
-all: documentation tutorial libsimple.o $(TANGLED_FILES) runtests
+all: documentation tutorial libruntime.o $(TANGLED_FILES) runtests
 
 documentation: $(BUILDDIR)/tutorial.html
 
-runtests: runtests.sh libsimple.o tutorial
+runtests: runtests.sh libruntime.o tutorial
 	./runtests.sh
 
 $(TANGLED_FILES): tutorial.nw
@@ -37,7 +37,7 @@ debug: tutorial.c
 tutorial: tutorial.c
 	$(CC) $< $(CFLAGS) $(LFLAGS) -o $@
 
-libsimple.o: libsimple.c
+libruntime.o: libruntime.c
 	$(CC) -m32 $(CFLAGS) -c $<
 
 clean:
