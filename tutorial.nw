@@ -21,7 +21,7 @@ print(plus(5,9))
 
 It takes two arguments and returns their sum. Here we have its Firm graph:
 
-.. image:: plus.png
+.. image:: plus.svg
  
 And this is the code emitted by the x86 backend:
 <<assembler.s>>=
