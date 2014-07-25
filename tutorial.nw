@@ -30,8 +30,8 @@ And this is the code emitted by the x86 backend:
 plus:
     pushl %ebp
     movl %esp, %ebp
-    fldl 8(%ebp)
-    faddl 16(%ebp)
+    movl 8(%ebp), %eax
+    addl 12(%ebp), %eax
     movl %ebp, %esp
     popl %ebp
     ret
