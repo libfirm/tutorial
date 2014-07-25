@@ -62,13 +62,20 @@ The tokens of the lexer are implemented as enum:
 
 <<types>>=
 // the lexer's tokens
-enum token_t {
-	TOK_EOF = -1,       // end of file
-	TOK_DEF = -2,       // function definition
-	TOK_EXT = -3,       // extern function
-	TOK_ID  = -4,       // identifier
-	TOK_NUM = -5,       // number
-};
+typedef enum token_kind {
+	TOK_EOF,       // end of file
+	TOK_DEF,       // 'def'
+	TOK_EXT,       // 'extern'
+	TOK_ID,        // identifier
+	TOK_NUM,       // number
+	TOK_PLUS,      // '+'
+	TOK_MINUS,     // '-'
+	TOK_STAR,      // '*'
+	TOK_LESS,      // '<'
+	TOK_LBRACE,    // '('
+	TOK_RBRACE,    // ')'
+	TOK_COMMA,     // ','
+} token_kind;
 
 @
 
@@ -96,7 +103,7 @@ The Function
 
 <<lexer>>=
 // returns the current token
-static int get_token(void)
+static token_kind get_token(void)
 {
 	static int ch = ' ';                            // the current character
 	char buffer[BUFFER_SIZE];                       // the input buffer
@@ -110,69 +117,70 @@ We can skip all whitespaces.
 		ch = fgetc(input);
 @
 
-Now we either have to deal with alphanumeric characters, numbers, comments the end of the file or an operator character. Operator characters are a special case, there is no lexer token to return for them. Instead their ASCII code is returned directly.
+Now we either have to deal with alphanumeric characters, numbers, comments the end of the file or an operator character.
 
 <<lexer>>=
 	// keyword or identifier
-	int ret;                                        // the return value
-	if (isalpha(ch)) {
-		// read in all successive alphanumeric characters
-		int i = 0;
-		do {
-			buffer[i++] = ch;
-			ch = fgetc(input);
-		} while (isalnum(ch));
-		buffer[i] = '\0';
-		// check for the keywords
-		if (strcmp(buffer, "def") == 0) {
-			ret = TOK_DEF;
-		}
-		else if (strcmp(buffer, "extern") == 0) {
-			ret = TOK_EXT;
-		}
-		else {
-			// it is an identifier
-			id_str = calloc(strlen(buffer) + 1, sizeof(char));
-			strcpy(id_str, buffer);
-			ret = TOK_ID;
-		}
-	} else if (isdigit(ch)) {
-		// read in all successive digits
-		int i = 0;
-		do {
-			buffer[i++] = ch;
-			ch = fgetc(input);
-		} while (isdigit(ch));
-		buffer[i] = '\0';
-
-		num_val = atoi(buffer);                // convert it to an int number
-		ret = TOK_NUM;
-	} else if (ch == '#') {
+	switch (ch) {
+	case '+': ch = fgetc(input); return TOK_PLUS;
+	case '-': ch = fgetc(input); return TOK_MINUS;
+	case '*': ch = fgetc(input); return TOK_STAR;
+	case '<': ch = fgetc(input); return TOK_LESS;
+	case '(': ch = fgetc(input); return TOK_LBRACE;
+	case ')': ch = fgetc(input); return TOK_RBRACE;
+	case ',': ch = fgetc(input); return TOK_COMMA;
+	case EOF: return TOK_EOF; // end of file
+	case '#':
 		// after the comment character we can ignore the rest of the line
-		do ch = fgetc(input);
-		while (ch != EOF && ch != '\n' && ch != '\r');
-		// check for the end of the file
-		if (ch == EOF)
-			ret = TOK_EOF;
+		do {
+		    ch = fgetc(input);
+		} while (ch != EOF && ch != '\n' && ch != '\r');
 		// return what comes after the comment
-		else
-			ret = get_token();
-	} else if (ch == EOF) {
-		// check for the end of the file
-		ret = TOK_EOF;
-	} else {
-		// it's an operator, which we return directly
-		ret = ch;
-		ch = fgetc(input);                           // get the next character
+		return get_token();
+
+	default:
+		if (isalpha(ch)) {
+			// read in all successive alphanumeric characters
+			int i = 0;
+			do {
+				buffer[i++] = ch;
+				ch = fgetc(input);
+			} while (isalnum(ch));
+			buffer[i] = '\0';
+			// check for the keywords
+			if (strcmp(buffer, "def") == 0) {
+				return TOK_DEF;
+			} else if (strcmp(buffer, "extern") == 0) {
+				return TOK_EXT;
+			} else {
+				// it is an identifier
+				id_str = calloc(strlen(buffer) + 1, sizeof(char));
+				strcpy(id_str, buffer);
+				return TOK_ID;
+			}
+		} else if (isdigit(ch)) {
+			// read in all successive digits
+			int i = 0;
+			do {
+				buffer[i++] = ch;
+				ch = fgetc(input);
+			} while (isdigit(ch));
+			buffer[i] = '\0';
+
+			num_val = atoi(buffer);              // convert to int number
+			return TOK_NUM;
+		} else {
+			fprintf(stderr, "Error: Unexpected character '%c'\n", ch);
+			ch = fgetc(input);
+			return get_token();
+		}
 	}
-	// return the token
-	return ret;
 }
 
 @
 
-This function is the one called from the parser, it's just a wrapper around [[get_token]].
- 
+This function is the one called from the parser, it's just a wrapper around [[get_token()]].
+
 <<lexer>>=
 // wrapper around get_token()
 static int next_token(void)
@@ -432,7 +440,7 @@ static expr_t *parse_id_expr(void)
 @
 Either the identifier is a call or a variable.
 <<parser>>=
-	if (cur_token != '(') {                                         // it's not a call
+	if (cur_token != TOK_LBRACE) {                                  // it's not a call
 		id_expr = new_expr(new_var_expr(identifier), EXPR_VAR);     // hence it's a variable
 	} else {
 		expr_t *args = NULL;
@@ -443,7 +451,7 @@ Parse the arguments of the call. They consist of expressions separated by commas
 
 <<parser>>=
 		next_token();
-		if (cur_token != ')') {                                     // the call has arguments
+		if (cur_token != TOK_RBRACE) {                              // the call has arguments
 			while (1) {
 				expr_t *e = parse_expr();                           // an argument is an expression
 
@@ -456,10 +464,10 @@ Parse the arguments of the call. They consist of expressions separated by commas
 				args = e;
 				c++;                                                // and count them
 
-				if (cur_token == ')')                               // we're done
+				if (cur_token == TOK_RBRACE)                        // we're done
 					break;
 
-				if (cur_token != ',') {                             // error checking
+				if (cur_token != TOK_COMMA) {                       // error checking
 					error("Expected ')' or ',' in argument list", "");
 					break;
 				}
@@ -524,7 +532,7 @@ static expr_t *parse_paren_expr(void)
 	next_token();                                                   // eat the '('
 	expr_t *result = parse_expr();                                  // parse the expression
 
-	if (cur_token != ')') {                                         // error checking
+	if (cur_token != TOK_RBRACE) {                                  // error checking
 		error("')' expected", "");
 		result = NULL;
 	}
@@ -548,7 +556,7 @@ static expr_t *parse_primary(void)
 		return parse_id_expr();
 	case TOK_NUM:
 		return parse_num_expr();
-	case '(':
+	case TOK_LBRACE:
 		return parse_paren_expr();
 	default: {
 		char info[2] = { cur_token, '\0' };
@@ -573,10 +581,10 @@ static int get_tok_prec(void)
 {
 	switch (cur_token) {
 	default: return -1;
-	case '<': return 10;
-	case '+':
-	case '-': return 20;
-	case '*': return 40;
+	case TOK_LESS:  return 10;
+	case TOK_PLUS:  return 20;
+	case TOK_MINUS: return 20;
+	case TOK_STAR:  return 40;
 	}
 }
 
@@ -632,7 +640,7 @@ static prototype_t *parse_prototype(void)
 		fn_name = id_str;
 		next_token();                                               // eat the name
 
-		if (cur_token != '(') {
+		if (cur_token != TOK_LBRACE) {
 			error("Expected '(' in prototype", "");
 		} else {
 			while (next_token() == TOK_ID) {                        // get the arguments
@@ -641,7 +649,7 @@ static prototype_t *parse_prototype(void)
 				args = arg;
 				argc++;
 			}
-			if (cur_token != ')') {
+			if (cur_token != TOK_RBRACE) {
 				error("Expected ')' in prototype", "");
 				args = NULL;
 			}
@@ -954,13 +962,13 @@ Now we can switch on the binary operator and create the corresponding node with 
 
 <<handle binary expressions>>=
 	switch (bin_ex->op) {
-	case '<':
+	case TOK_LESS:
 		return new_Cmp(lhs, rhs, ir_relation_less); // compare lhs with rhs
-	case '+':
+	case TOK_PLUS:
 		return new_Add(lhs, rhs, int_mode);
-	case '-':
+	case TOK_MINUS:
 		return new_Sub(lhs, rhs, int_mode);
-	case '*':
+	case TOK_STAR:
 		return new_Mul(lhs, rhs, int_mode);
 	default:
 		error("Invalid binary expression", "");
