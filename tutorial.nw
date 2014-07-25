@@ -103,7 +103,7 @@ The Function
 
 <<lexer>>=
 // returns the current token
-static token_kind get_token(void)
+static token_kind next_token(void)
 {
 	static int ch = ' ';                            // the current character
 	char buffer[BUFFER_SIZE];                       // the input buffer
@@ -136,7 +136,7 @@ Now we either have to deal with alphanumeric characters, numbers, comments the e
 		    ch = fgetc(input);
 		} while (ch != EOF && ch != '\n' && ch != '\r');
 		// return what comes after the comment
-		return get_token();
+		return next_token();
 
 	default:
 		if (isalpha(ch)) {
@@ -172,21 +172,9 @@ Now we either have to deal with alphanumeric characters, numbers, comments the e
 		} else {
 			fprintf(stderr, "Error: Unexpected character '%c'\n", ch);
 			ch = fgetc(input);
-			return get_token();
+			return next_token();
 		}
 	}
-}
-
-@
-
-This function is the one called from the parser, it's just a wrapper around [[get_token()]].
-
-<<lexer>>=
-// wrapper around get_token()
-static int next_token(void)
-{
-	cur_token = get_token();
-	return cur_token;
 }
 
 @
