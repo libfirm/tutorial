@@ -424,7 +424,7 @@ static expr_t *parse_id_expr(void)
 	char *identifier = id_str;
 	expr_t *id_expr = NULL;
 
-	next_token();
+	cur_token = next_token();
 @
 Either the identifier is a call or a variable.
 <<parser>>=
@@ -438,7 +438,7 @@ Either the identifier is a call or a variable.
 Parse the arguments of the call. They consist of expressions separated by commas, the list ends with a ')'. So we parse each one at a time and check for a following comma, until we reach the ')' indicating the end of the call.
 
 <<parser>>=
-		next_token();
+		cur_token = next_token();
 		if (cur_token != TOK_RBRACE) {                              // the call has arguments
 			while (1) {
 				expr_t *e = parse_expr();                           // an argument is an expression
@@ -460,11 +460,11 @@ Parse the arguments of the call. They consist of expressions separated by commas
 					break;
 				}
 
-				next_token();
+				cur_token = next_token();
 			}
 		}
 
-		next_token();
+		cur_token = next_token();
 		// create the call expression
 		call_expr_t *call = new_call_expr(identifier, args, c);
 		if (check_call(call)) {                                     // check if the call is valid
@@ -501,7 +501,7 @@ All we need to do, is to wrap the number value in the number expression structur
 static expr_t *parse_num_expr(void)
 {
 	num_expr_t *expr = new_num_expr(num_val);
-	next_token();
+	cur_token = next_token();
 
 	return new_expr(expr, EXPR_NUM);
 }
@@ -517,7 +517,7 @@ Parsing parenthesis expressions is simple, we discard the parentheses and parse 
 // parse a parenthesis expression
 static expr_t *parse_paren_expr(void)
 {
-	next_token();                                                   // eat the '('
+	cur_token = next_token();                                                   // eat the '('
 	expr_t *result = parse_expr();                                  // parse the expression
 
 	if (cur_token != TOK_RBRACE) {                                  // error checking
@@ -587,7 +587,7 @@ static expr_t *parse_bin_rhs(int min_prec, expr_t *lhs)
 			return lhs;
 		// our binary operator is the current token
 		int bin_op = cur_token;
-		next_token();
+		cur_token = next_token();
 		// parse the rhs as primary expression
 		expr_t *rhs = parse_primary();
 		if (!rhs)
@@ -626,12 +626,12 @@ static prototype_t *parse_prototype(void)
 		error("Expected function name in prototype", "");
 	} else {
 		fn_name = id_str;
-		next_token();                                               // eat the name
+		cur_token = next_token();                                   // eat the name
 
 		if (cur_token != TOK_LBRACE) {
 			error("Expected '(' in prototype", "");
 		} else {
-			while (next_token() == TOK_ID) {                        // get the arguments
+			while ((cur_token = next_token()) == TOK_ID) {          // get the arguments
 				parameter_t *arg = new_parameter(id_str);
 				arg->next = args;
 				args = arg;
@@ -644,7 +644,7 @@ static prototype_t *parse_prototype(void)
 		}
 	}
 
-	next_token();
+	cur_token = next_token();
 
 	// if a prototype with this name already exists, don't create another one
 	for (prototype_t *p = prototypes; p != NULL; p = p->next) {
@@ -670,7 +670,7 @@ Function definitions consist of the head of the function which can be parsed as 
 // parse the definition of a function
 static bool parse_definition(void)
 {
-	next_token();
+	cur_token = next_token();
 
 	prototype_t *head = parse_prototype();                     // its head is a prototype
 	expr_t *body = parse_expr();                               // its body is an expression
@@ -733,34 +733,33 @@ Main Parser Loop
 This function iterates through the source file till it reaches the end, or an error occurs. In the loop it switches on the [[cur_token]], calling the corresponding parser function.
 
 <<parser>>=
-// the main parser loop
-static bool parser_loop(void)
+// the main parser function
+static bool parse(void)
 {
-	bool err = false;
-	next_token();
+	cur_token = next_token();
 	// parse the file till we reach the end
-	while (!err) {
+	while (true) {
 		switch (cur_token) {
 			case TOK_EOF:
 				return true;
 			case TOK_DEF:
-				err = !parse_definition();
+				if (!parse_definition())
+					return false;
 				break;
 			case TOK_EXT:
-				next_token();
-				err = (parse_prototype() == NULL);
+				cur_token = next_token();
+				if (parse_prototype() == NULL)
+					return false;
 				break;
 			case ';':
-				next_token();
+				cur_token = next_token();
 				break;
 			default:
-				err = !parse_top_lvl();
+				if (!parse_top_lvl())
+					return false;
 				break;
 		}
-		if (err) error("Unexpected Parser Error!", "");
 	}
-	// an error occurred
-	return false;
 }
 
 @
@@ -1103,7 +1102,7 @@ int main(int argc, char **argv)
 	// handle the arguments
 	if (argc == 2) {
 		src_name = argv[1];
-	} else if (argc == 3 && !strcmp(argv[1], "-d")) {
+	} else if (argc == 3 && strcmp(argv[1], "-d")==0) {
 		src_name = argv[2];
 		opt_dump = true;
 	} else {
@@ -1122,34 +1121,37 @@ int main(int argc, char **argv)
 If the parser loop returns true, we can start the creation of the Firm graph.
 
 <<main>>=
-	if (parser_loop()) {                        // run the parser loop
+	bool parse_fine = parse();
+	if (!parse_fine) {
+		error("Had a parse error, aborting", "");
+		exit(1);
+	}
 @
 
 To initialize the Firm library the [[void ir_init();]] function is called, which results in the standard settings being used.
 
 <<main>>=
-		ir_init();                              // initialize libFirm
+	ir_init();                              // initialize libFirm
 
-		<<initialize modes and types>>
-		// create the graphs
-		create_prototype_entities();
-		create_func_graphs();
-		create_main();
+	<<initialize modes and types>>
+	// create the graphs
+	create_prototype_entities();
+	create_func_graphs();
+	create_main();
 @
 
 To dump the graphs we call [[void dump_all_ir_graphs(const char *suffix);]] which calls the [[ir_dump_graph(ir_graph *irg, const char *suffix)]] for each graph in the program.
 
 <<main>>=
-		if (opt_dump)                           // dump all graphs
-			dump_all_ir_graphs("");
+	if (opt_dump)                           // dump all graphs
+		dump_all_ir_graphs("");
 @
 
 Emitting the code is as simple as calling the [[void be_main(FILE *output, const char *compilation_unit_name);]]. And finally we call [[void ir_finish(void);]] to free all the memory occupied by the Firm library. For simplicity we always emit the code to the standard output [[stdout]].
 
 <<main>>=
-		be_main(stdout, src_name);              // emit code
-		ir_finish();                            // clean up
-	}
+	be_main(stdout, src_name);              // emit code
+	ir_finish();                            // clean up
 
 	return 0;
 }
@@ -1159,10 +1161,11 @@ Putting it all together
 =======================
 
 <<*>>=
-#include <stdlib.h>
-#include <stdbool.h>
 #include <ctype.h>
+#include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <libfirm/firm.h>
 
