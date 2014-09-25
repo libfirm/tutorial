@@ -740,24 +740,24 @@ static bool parse(void)
 	// parse the file till we reach the end
 	while (true) {
 		switch (cur_token) {
-			case TOK_EOF:
-				return true;
-			case TOK_DEF:
-				if (!parse_definition())
-					return false;
-				break;
-			case TOK_EXT:
-				cur_token = next_token();
-				if (parse_prototype() == NULL)
-					return false;
-				break;
-			case ';':
-				cur_token = next_token();
-				break;
-			default:
-				if (!parse_top_lvl())
-					return false;
-				break;
+        case TOK_EOF:
+            return true;
+        case TOK_DEF:
+            if (!parse_definition())
+                return false;
+            break;
+        case TOK_EXT:
+            cur_token = next_token();
+            if (parse_prototype() == NULL)
+                return false;
+            break;
+        case ';':
+            cur_token = next_token();
+            break;
+        default:
+            if (!parse_top_lvl())
+                return false;
+            break;
 		}
 	}
 }
