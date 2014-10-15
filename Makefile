@@ -1,6 +1,7 @@
 -include config.mak
 FIRM_CFLAGS ?= $(shell pkg-config --cflags libfirm)
 FIRM_LIBS ?= $(shell pkg-config --libs libfirm)
+YCOMP ?= ycomp
 
 CFLAGS = -Wall -W -std=c99 $(FIRM_CFLAGS) -O0 -g3
 LFLAGS = $(FIRM_LIBS)
@@ -41,6 +42,13 @@ tutorial: tutorial.c
 
 libruntime.o: libruntime.c
 	$(CC) -m32 $(CFLAGS) -c $<
+
+$(BUILDDIR)/plus.vcg: plus.simple tutorial
+	./tutorial -d $< > /dev/null
+	mv plus-00.vcg $@
+
+plus.svg: $(BUILDDIR)/plus.vcg
+	$(YCOMP) $< --export $@
 
 clean:
 	rm -f tutorial debug libsimple.o
