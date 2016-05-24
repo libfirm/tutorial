@@ -778,10 +778,10 @@ Creating The Entities
 static void create_prototype_entities(void)
 {
 	for (prototype_t *proto = prototypes; proto != NULL; proto = proto->next) {
-		ir_type *proto_type = new_type_method(proto->argc, 1);  // create a method type
-		for (int i = 0; i < proto->argc; i++)                   // for each parameter
-			set_method_param_type(proto_type, i, int_type);     // set its type to double
-		set_method_res_type(proto_type, 0, int_type);           // do the same for the result type
+		ir_type *proto_type = new_type_method(proto->argc, 1, false);  // create a method type
+		for (int i = 0; i < proto->argc; i++)                          // for each parameter
+			set_method_param_type(proto_type, i, int_type);        // set its type to double
+		set_method_res_type(proto_type, 0, int_type);                  // do the same for the result type
 		// that's all we need to create the entity
 		proto->ent = new_entity(get_glob_type(), new_id_from_str(proto->name), proto_type);
 	}
@@ -791,7 +791,7 @@ static void create_prototype_entities(void)
 
 For each prototype the following FIRM constructors are called:
 
-[[ir_type *new_type_method(int n_param, int n_res);]]
+[[ir_type *new_type_method(size_t n_param, size_t n_res, bool is_variadic);]]
 The [[ir_type]] keeps track of the number of parameters and results of the function. We set the type of each parameter and the single result to double as this is the only data type in the simple language.
 
 [[int_type]] and [[int_mode]] are global variables of the frontend:
@@ -1055,7 +1055,7 @@ This one is quite simple, we take all the top level expressions in the correct o
 // create the main graph
 static void create_main(void)
 {
-	ir_type *type = new_type_method(0, 1);                // create the type
+	ir_type *type = new_type_method(0, 1, false);         // create the type
 	set_method_res_type(type, 0, int_type);               // set the result type
 	// create an entity
 	ir_entity *ent = new_entity(get_glob_type(), new_id_from_str("__simple_main"), type);
