@@ -945,18 +945,18 @@ As the left and right hand side of a binary expression are expressions themselve
 	ir_node *rhs = handle_expr(bin_ex->rhs, args);
 @
 
-Now we can switch on the binary operator and create the corresponding node with the right and left hand side as arguments. Their constructors are all quite similar. Take the constructor of an add node as an example: [[ir_node *new_Add(ir_node *op1, ir_node *op2, ir_mode *mode);]]
+Now we can switch on the binary operator and create the corresponding node with the right and left hand side as arguments. Their constructors are all quite similar. Take the constructor of an add node as an example: [[ir_node *new_Add(ir_node *op1, ir_node *op2);]]
 
 <<handle binary expressions>>=
 	switch (bin_ex->op) {
 	case TOK_LESS:
 		return new_Cmp(lhs, rhs, ir_relation_less); // compare lhs with rhs
 	case TOK_PLUS:
-		return new_Add(lhs, rhs, int_mode);
+		return new_Add(lhs, rhs);
 	case TOK_MINUS:
-		return new_Sub(lhs, rhs, int_mode);
+		return new_Sub(lhs, rhs);
 	case TOK_STAR:
-		return new_Mul(lhs, rhs, int_mode);
+		return new_Mul(lhs, rhs);
 	default:
 		error("Invalid binary expression", "");
 		return NULL;
