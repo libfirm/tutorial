@@ -1132,6 +1132,7 @@ To initialize the Firm library the [[void ir_init();]] function is called, which
 
 <<main>>=
 	ir_init();                              // initialize libFirm
+	be_initialize();                        // initialize backend
 
 	<<initialize modes and types>>
 	// create the graphs
