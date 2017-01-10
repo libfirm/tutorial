@@ -1129,6 +1129,9 @@ If the parser loop returns true, we can start the creation of the Firm graph.
 @
 
 To initialize the Firm library the [[void ir_init();]] function is called, which results in the standard settings being used.
+Additionally, the backend requires a separate initialization via [[void be_initialize();]].
+More complex compilers can configure the backend in between the two calls,
+but this is not necessary for us here.
 
 <<main>>=
 	ir_init();                              // initialize libFirm
