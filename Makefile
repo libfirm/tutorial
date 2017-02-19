@@ -41,7 +41,7 @@ tutorial: tutorial.c
 	$(CC) $< $(CFLAGS) $(LFLAGS) -o $@
 
 libruntime.o: libruntime.c
-	$(CC) -m32 $(CFLAGS) -c $<
+	$(CC) $(CFLAGS) -c $<
 
 $(BUILDDIR)/plus.vcg: plus.simple tutorial
 	./tutorial -d $< > /dev/null

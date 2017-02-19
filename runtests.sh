@@ -9,10 +9,10 @@ do
 		echo "Compile error"
 		RC=1
 	else
-		`gcc -m32 libruntime.o $assembly -o ${src%.simple}`
+		`gcc libruntime.o $assembly -o ${src%.simple}`
 		echo "ok"
 		echo "Running $src..."
-		./${src%.simple} < /dev/null || RC=1
+		echo 'A' | ./${src%.simple} || RC=1
 		rm -f "${src%.simple}"
 	fi
 	rm -f "${assembly}"

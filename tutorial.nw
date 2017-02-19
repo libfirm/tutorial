@@ -783,7 +783,8 @@ static void create_prototype_entities(void)
 			set_method_param_type(proto_type, i, int_type);                                       // set its type to double
 		set_method_res_type(proto_type, 0, int_type);                                                 // do the same for the result type
 		// that's all we need to create the entity
-		proto->ent = new_entity(get_glob_type(), new_id_from_str(proto->name), proto_type);
+		ident *name = ir_platform_mangle_global(new_id_from_str(proto->name));
+		proto->ent = new_entity(get_glob_type(), name, proto_type);
 	}
 }
 
@@ -1058,7 +1059,8 @@ static void create_main(void)
 	ir_type *type = new_type_method(0, 1, false, cc_cdecl_set, mtp_no_property);  // create the type
 	set_method_res_type(type, 0, int_type);                                       // set the result type
 	// create an entity
-	ir_entity *ent = new_entity(get_glob_type(), new_id_from_str("__simple_main"), type);
+	ident *name = ir_platform_mangle_global(new_id_from_str("__simple_main"));
+	ir_entity *ent = new_entity(get_glob_type(), name, type);
 	// create a fresh graph
 	ir_graph *fn_main = new_ir_graph(ent, 0);
 	set_current_ir_graph(fn_main);
@@ -1096,25 +1098,16 @@ This is what the main function looks like. It checks the command line parameters
 <<main>>=
 int main(int argc, char **argv)
 {
-	char *src_name = NULL;
-	bool opt_dump = false;                      // '-d' as the first argument enables dumping
-
-	// handle the arguments
-	if (argc == 2) {
-		src_name = argv[1];
-	} else if (argc == 3 && strcmp(argv[1], "-d")==0) {
-		src_name = argv[2];
-		opt_dump = true;
-	} else {
-		error("No source file provided", "");
-		exit(1);
+	if (argc != 2) {
+		error("Please specify exactly one source file as argument", "");
+		return 1;
 	}
+	const char *filename = argv[1];
 
-	// open the source file
-	input = fopen(src_name, "r");
+	input = fopen(filename, "r");
 	if (input == NULL) {
 		error("Could not open source file: ", strerror(errno));
-		exit(1);
+		return 1;
 	}
 @
 
@@ -1124,18 +1117,14 @@ If the parser loop returns true, we can start the creation of the Firm graph.
 	bool parse_fine = parse();
 	if (!parse_fine) {
 		error("Had a parse error, aborting", "");
-		exit(1);
+		return 1;
 	}
 @
 
 To initialize the Firm library the [[void ir_init();]] function is called, which results in the standard settings being used.
-Additionally, the backend requires a separate initialization via [[void be_initialize();]].
-More complex compilers can configure the backend in between the two calls,
-but this is not necessary for us here.
 
 <<main>>=
 	ir_init();                              // initialize libFirm
-	be_initialize();                        // initialize backend
 
 	<<initialize modes and types>>
 	// create the graphs
@@ -1147,14 +1136,13 @@ but this is not necessary for us here.
 To dump the graphs we call [[void dump_all_ir_graphs(const char *suffix);]] which calls the [[ir_dump_graph(ir_graph *irg, const char *suffix)]] for each graph in the program.
 
 <<main>>=
-	if (opt_dump)                           // dump all graphs
-		dump_all_ir_graphs("");
+	dump_all_ir_graphs("");
 @
 
 Emitting the code is as simple as calling the [[void be_main(FILE *output, const char *compilation_unit_name);]]. And finally we call [[void ir_finish(void);]] to free all the memory occupied by the Firm library. For simplicity we always emit the code to the standard output [[stdout]].
 
 <<main>>=
-	be_main(stdout, src_name);              // emit code
+	be_main(stdout, filename);              // emit code
 	ir_finish();                            // clean up
 
 	return 0;
